@@ -1,19 +1,32 @@
-*.iml
-.kotlin
-.gradle
+# Gradle, Kotlin e artefatos de compilação
+.gradle/
+.kotlin/
 **/build/
+out/
+*.class
+*.dex
+*.apk
+*.aab
+*.aar
+
+# Arquivos locais das IDEs e SDKs
+*.iml
 xcuserdata
 !src/**/build/
 local.properties
-.idea
+.idea/
 .DS_Store
-captures
-.externalNativeBuild
-.cxx
+captures/
+.externalNativeBuild/
+.cxx/
+
+# Xcode
 *.xcodeproj/*
 !*.xcodeproj/project.pbxproj
 !*.xcodeproj/xcshareddata/
 !*.xcodeproj/project.xcworkspace/
 !*.xcworkspace/contents.xcworkspacedata
 **/xcshareddata/WorkspaceSettings.xcsettings
+
+# Dependências JavaScript
 node_modules/
