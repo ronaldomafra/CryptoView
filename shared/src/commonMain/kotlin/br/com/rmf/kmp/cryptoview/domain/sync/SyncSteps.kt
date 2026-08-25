@@ -72,7 +72,27 @@ internal class SyncExchangesStep(
         val pageSize = config.networkPageSize
         var firstPage = (context.committedPages[phase]?.maxOrNull() ?: 0) + 1
         var reachedLastPage = false
+        var restrictedByPlan = false
         var discovered = local.countExchanges()
+
+        if (firstPage == 1) {
+            emit(SyncEvent.PageRequested(phase, firstPage))
+            val items = try {
+                requestWithRetry { remote.exchangeListings(start = 1, limit = pageSize) }
+            } catch (exception: SyncStepException) {
+                if (exception.error is CryptoError.PlanUnavailable) {
+                    local.markResourceFailure(RESOURCE_KEY, "PLAN_UNAVAILABLE")
+                    emit(SyncEvent.StepSkipped(phase, "Corretoras indisponíveis no plano atual"))
+                    emit(SyncEvent.TargetDiscovered(phase, discovered))
+                    return@flow
+                }
+                throw exception
+            }
+            local.persistExchangePage(context.runId, firstPage, items)
+            emit(SyncEvent.PageCommitted(phase, firstPage, items.size))
+            reachedLastPage = items.size < pageSize
+            firstPage += 1
+        }
 
         while (!reachedLastPage) {
             val pages = (firstPage until firstPage + EXCHANGE_PAGE_WINDOW).toList()
@@ -82,25 +102,39 @@ internal class SyncExchangesStep(
                 .flatMapMerge(concurrency = EXCHANGE_PAGE_WINDOW) { page ->
                     flow {
                         emit(SyncEvent.PageRequested(phase, page))
-                        val items = requestWithRetry {
-                            remote.exchangeListings(start = ((page - 1) * pageSize) + 1, limit = pageSize)
+                        try {
+                            val items = requestWithRetry {
+                                remote.exchangeListings(start = ((page - 1) * pageSize) + 1, limit = pageSize)
+                            }
+                            local.persistExchangePage(context.runId, page, items)
+                            pageResultsMutex.withLock { pageResults += page to items.size }
+                            emit(SyncEvent.PageCommitted(phase, page, items.size))
+                        } catch (exception: SyncStepException) {
+                            if (exception.error is CryptoError.PlanUnavailable && page > 1) {
+                                pageResultsMutex.withLock {
+                                    restrictedByPlan = true
+                                    pageResults += page to -1
+                                }
+                            } else {
+                                throw exception
+                            }
                         }
-                        local.persistExchangePage(context.runId, page, items)
-                        pageResultsMutex.withLock { pageResults += page to items.size }
-                        emit(SyncEvent.PageCommitted(phase, page, items.size))
                     }
                 }
                 .buffer(config.responseBufferCapacity)
                 .collect { emit(it) }
 
-            reachedLastPage = pageResults.any { it.second < pageSize }
+            reachedLastPage = restrictedByPlan || pageResults.any { it.second in 0 until pageSize }
             firstPage += EXCHANGE_PAGE_WINDOW
             if (pageResults.all { it.second == 0 }) reachedLastPage = true
         }
 
         discovered = local.countExchanges()
-        local.markExchangesComplete(context.runId)
+        if (!restrictedByPlan) local.markExchangesComplete(context.runId)
         local.markResourceSuccess(RESOURCE_KEY)
+        if (restrictedByPlan) {
+            emit(SyncEvent.StepSkipped(phase, "Catálogo de corretoras limitado pelo plano atual"))
+        }
         emit(SyncEvent.TargetDiscovered(phase, discovered))
     }
 
@@ -166,6 +200,25 @@ internal class SyncCoinsStep(
         val pageSize = config.networkPageSize
         var firstPage = (context.committedPages[phase]?.maxOrNull() ?: 0) + 1
         var reachedLastPage = false
+        var restrictedByPlan = false
+        if (firstPage == 1) {
+            emit(SyncEvent.PageRequested(phase, firstPage))
+            val items = try {
+                requestWithRetry { remote.coinListings(start = 1, limit = pageSize) }
+            } catch (exception: SyncStepException) {
+                if (exception.error is CryptoError.PlanUnavailable) {
+                    local.markResourceFailure("coin_catalog", "PLAN_UNAVAILABLE")
+                    emit(SyncEvent.StepSkipped(phase, "Moedas indisponíveis no plano atual"))
+                    emit(SyncEvent.TargetDiscovered(phase, local.countCoins()))
+                    return@flow
+                }
+                throw exception
+            }
+            local.persistCoinPage(context.runId, firstPage, items)
+            emit(SyncEvent.PageCommitted(phase, firstPage, items.size))
+            reachedLastPage = items.size < pageSize
+            firstPage += 1
+        }
         while (!reachedLastPage) {
             val pages = (firstPage until firstPage + config.networkParallelism).toList()
             val pageResults = mutableListOf<Pair<Int, Int>>()
@@ -174,22 +227,38 @@ internal class SyncCoinsStep(
                 .flatMapMerge(concurrency = config.networkParallelism) { page ->
                     flow {
                         emit(SyncEvent.PageRequested(phase, page))
-                        val items = requestWithRetry {
-                            remote.coinListings(((page - 1) * pageSize) + 1, pageSize)
+                        try {
+                            val items = requestWithRetry {
+                                remote.coinListings(((page - 1) * pageSize) + 1, pageSize)
+                            }
+                            local.persistCoinPage(context.runId, page, items)
+                            pageResultsMutex.withLock { pageResults += page to items.size }
+                            emit(SyncEvent.PageCommitted(phase, page, items.size))
+                        } catch (exception: SyncStepException) {
+                            if (exception.error is CryptoError.PlanUnavailable && page > 1) {
+                                pageResultsMutex.withLock {
+                                    restrictedByPlan = true
+                                    pageResults += page to -1
+                                }
+                            } else {
+                                throw exception
+                            }
                         }
-                        local.persistCoinPage(context.runId, page, items)
-                        pageResultsMutex.withLock { pageResults += page to items.size }
-                        emit(SyncEvent.PageCommitted(phase, page, items.size))
                     }
                 }
                 .buffer(config.responseBufferCapacity)
                 .collect { emit(it) }
 
-            reachedLastPage = pageResults.any { it.second < pageSize } || pageResults.all { it.second == 0 }
+            reachedLastPage = restrictedByPlan ||
+                pageResults.any { it.second in 0 until pageSize } ||
+                pageResults.all { it.second == 0 }
             firstPage += config.networkParallelism
         }
-        local.markCoinsComplete(context.runId)
+        if (!restrictedByPlan) local.markCoinsComplete(context.runId)
         local.markResourceSuccess("coin_catalog")
+        if (restrictedByPlan) {
+            emit(SyncEvent.StepSkipped(phase, "Catálogo de moedas limitado pelo plano atual"))
+        }
         emit(SyncEvent.TargetDiscovered(phase, local.countCoins()))
     }
 }

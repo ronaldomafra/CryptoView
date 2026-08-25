@@ -162,7 +162,11 @@ internal class DefaultCryptoSyncManager(
                         is SyncEvent.StepSkipped -> progress.copy(
                             phase = event.phase,
                             message = event.reason,
-                        )
+                        ).also {
+                            if (event.reason.contains("plano", ignoreCase = true) ||
+                                event.reason.contains("cota", ignoreCase = true)
+                            ) restricted = true
+                        }
                         is SyncEvent.TargetDiscovered -> {
                             targets[event.phase] = event.items
                             progress.copy(plannedItems = targets.values.sum())

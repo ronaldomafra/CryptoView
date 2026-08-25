@@ -1,6 +1,7 @@
 package br.com.rmf.kmp.cryptoview.data.database
 
 import app.cash.sqldelight.db.SqlDriver
+import app.cash.sqldelight.db.QueryResult
 import br.com.rmf.kmp.cryptoview.database.CryptoDatabase
 import br.com.rmf.kmp.cryptoview.utils.CryptoProcessConfig
 import kotlinx.coroutines.sync.Mutex
@@ -17,10 +18,10 @@ interface CryptoDatabaseDriverFactory {
 internal fun CryptoDatabaseDriverFactory.createConfiguredDriver(
     config: CryptoProcessConfig,
 ): SqlDriver = createDriver().also { driver ->
-    driver.execute(null, "PRAGMA foreign_keys=ON", 0)
-    driver.execute(null, "PRAGMA journal_mode=WAL", 0)
-    driver.execute(null, "PRAGMA synchronous=NORMAL", 0)
-    driver.execute(null, "PRAGMA busy_timeout=${config.databaseBusyTimeoutMillis}", 0)
+    driver.executePragmaQuery("PRAGMA foreign_keys=ON")
+    driver.executePragmaQuery("PRAGMA journal_mode=WAL")
+    driver.executePragmaQuery("PRAGMA synchronous=NORMAL")
+    driver.executePragmaQuery("PRAGMA busy_timeout=${config.databaseBusyTimeoutMillis}")
 }
 
 internal data class CryptoDatabaseConnection(
@@ -63,14 +64,14 @@ internal class CryptoDatabasePool(
             committedBatches % config.walCheckpointEveryCommittedBatches == 0
         }
         if (shouldCheckpoint) {
-            runCatching { driver.execute(null, "PRAGMA wal_checkpoint(PASSIVE)", 0) }
+            runCatching { driver.executePragmaQuery("PRAGMA wal_checkpoint(PASSIVE)") }
         }
     }
 
     suspend fun checkpoint(mode: String = "PASSIVE") {
         withConnection { connection ->
             runCatching {
-                connection.driver.execute(null, "PRAGMA wal_checkpoint($mode)", 0)
+                connection.driver.executePragmaQuery("PRAGMA wal_checkpoint($mode)")
             }
         }
     }
@@ -87,4 +88,17 @@ internal class CryptoDatabasePool(
         val driver = driverFactory.createConfiguredDriver(config)
         return CryptoDatabaseConnection(driver, CryptoDatabase(driver)).also(all::add)
     }
+}
+
+private fun SqlDriver.executePragmaQuery(sql: String) {
+    executeQuery(
+        identifier = null,
+        sql = sql,
+        mapper = { cursor ->
+            cursor.next().value
+            QueryResult.Value(Unit)
+        },
+        parameters = 0,
+        binders = null,
+    ).value
 }

@@ -49,6 +49,7 @@ kotlin {
             implementation(libs.compose.uiTooling)
             implementation(libs.ktor.client.cio)
             implementation(libs.sqldelight.android.driver)
+            implementation(libs.androidx.sqlite.framework)
         }
         iosMain.dependencies {
             implementation(libs.ktor.client.darwin)
