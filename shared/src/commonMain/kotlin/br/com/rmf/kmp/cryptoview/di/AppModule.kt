@@ -5,6 +5,10 @@ import br.com.rmf.kmp.cryptoview.data.api.CoinMarketCapService
 import br.com.rmf.kmp.cryptoview.data.api.createCoinMarketCapService
 import br.com.rmf.kmp.cryptoview.domain.repository.CoinMarketCapDataRepository
 import br.com.rmf.kmp.cryptoview.domain.usecase.GetKeyInfoUseCase
+import br.com.rmf.kmp.cryptoview.security.DataStoreEncryptedApiKeyEnvelopeStore
+import br.com.rmf.kmp.cryptoview.security.DefaultSecureApiKeyStorage
+import br.com.rmf.kmp.cryptoview.security.EncryptedApiKeyEnvelopeStore
+import br.com.rmf.kmp.cryptoview.security.SecureApiKeyStorage
 import br.com.rmf.kmp.cryptoview.ui.viewmodel.CoinMarketCapTestViewModel
 import de.jensklingenberg.ktorfit.Ktorfit
 import de.jensklingenberg.ktorfit.converter.FlowConverterFactory
@@ -46,6 +50,23 @@ internal val useCaseModule = module {
     }
 }
 
+internal val securityModule = module {
+    single<EncryptedApiKeyEnvelopeStore> {
+        DataStoreEncryptedApiKeyEnvelopeStore(dataStore = get())
+    }
+    single<SecureApiKeyStorage> {
+        DefaultSecureApiKeyStorage(
+            cipher = get(),
+            envelopeStore = get(),
+        )
+    }
+}
+
 internal val viewModelModule = module {
-    factory { CoinMarketCapTestViewModel(repository = get()) }
+    factory {
+        CoinMarketCapTestViewModel(
+            repository = get(),
+            secureApiKeyStorage = get(),
+        )
+    }
 }

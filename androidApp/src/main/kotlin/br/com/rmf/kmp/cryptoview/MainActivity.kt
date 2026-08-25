@@ -6,12 +6,12 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.tooling.preview.Preview
-import br.com.rmf.kmp.cryptoview.di.initKoin
+import br.com.rmf.kmp.cryptoview.di.initKoinAndroid
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        initKoin()
+        initKoinAndroid(applicationContext)
         enableEdgeToEdge()
 
         setContent {

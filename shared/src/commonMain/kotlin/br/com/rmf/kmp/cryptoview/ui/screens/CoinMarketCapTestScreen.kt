@@ -19,14 +19,19 @@ import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -42,7 +47,6 @@ import br.com.rmf.kmp.cryptoview.ui.theme.CryptoNegative
 import br.com.rmf.kmp.cryptoview.ui.theme.CryptoOrange
 import br.com.rmf.kmp.cryptoview.ui.theme.CryptoPositive
 import br.com.rmf.kmp.cryptoview.ui.viewmodel.CoinMarketCapTestViewModel
-import br.com.rmf.kmp.cryptoview.utils.TempUtils
 import org.koin.mp.KoinPlatformTools
 
 @Composable
@@ -52,29 +56,26 @@ fun CoinMarketCapTestScreen() {
     }
     val state by testViewModel.uiState.collectAsStateWithLifecycle()
     val isLoading = state is CoinMarketCapTestUiState.Loading
+    var apiKey by remember { mutableStateOf("") }
 
     Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .windowInsetsPadding(WindowInsets.safeDrawing),
+        modifier = Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing),
         contentAlignment = Alignment.TopCenter,
     ) {
         LazyColumn(
-            modifier = Modifier
-                .fillMaxSize()
-                .widthIn(max = 820.dp),
+            modifier = Modifier.fillMaxSize().widthIn(max = 820.dp),
             contentPadding = PaddingValues(16.dp),
             verticalArrangement = Arrangement.spacedBy(13.dp),
         ) {
             item {
                 Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                     Text(
-                        text = "Testes da API",
-                        style = MaterialTheme.typography.headlineMedium,
+                        text = "Teste do armazenamento seguro",
+                        style = MaterialTheme.typography.headlineSmall,
                         fontWeight = FontWeight.Bold,
                     )
                     Text(
-                        text = "Tela temporária para validar a integração com a CoinMarketCap.",
+                        text = "Valide a API key, grave o envelope criptografado e teste sua recuperação.",
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
@@ -86,36 +87,52 @@ fun CoinMarketCapTestScreen() {
                         modifier = Modifier.padding(16.dp),
                         verticalArrangement = Arrangement.spacedBy(11.dp),
                     ) {
-                        Text(
-                            text = "GET /v1/key/info",
-                            style = MaterialTheme.typography.titleLarge,
-                            fontWeight = FontWeight.Bold,
-                        )
-                        InfoRow("Origem da chave", "TempUtils.API_KEY")
-                        InfoRow("Chave utilizada", TempUtils.API_KEY.maskedApiKey())
-                        SettingsDivider()
-                        PrimaryActionButton(
-                            text = "Consultar informações da chave",
-                            onClick = {
-                                testViewModel.executeKeyInfoTest(
-                                    testName = "Consulta GET /v1/key/info",
-                                    apiKey = TempUtils.API_KEY,
-                                )
-                            },
+                        Text("CoinMarketCap API key", style = MaterialTheme.typography.titleMedium)
+                        OutlinedTextField(
+                            value = apiKey,
+                            onValueChange = { apiKey = it },
+                            label = { Text("API key") },
+                            visualTransformation = PasswordVisualTransformation(),
+                            singleLine = true,
                             modifier = Modifier.fillMaxWidth(),
                             enabled = !isLoading,
                         )
-                        OutlinedButton(
+                        Text(
+                            text = "O texto puro não é exibido no resultado nem persistido no DataStore.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        PrimaryActionButton(
+                            text = "Validar e salvar com segurança",
                             onClick = {
-                                testViewModel.executeKeyInfoTest(
-                                    testName = "Validação local sem chave",
-                                    apiKey = "",
-                                )
+                                val candidate = apiKey
+                                apiKey = ""
+                                testViewModel.validateAndSave(candidate)
                             },
+                            modifier = Modifier.fillMaxWidth(),
+                            enabled = !isLoading && apiKey.isNotBlank(),
+                        )
+                        SettingsDivider()
+                        OutlinedButton(
+                            onClick = testViewModel::readAndValidate,
                             modifier = Modifier.fillMaxWidth(),
                             enabled = !isLoading,
                         ) {
-                            Text("Testar parâmetro inválido")
+                            Text("Ler, descriptografar e validar")
+                        }
+                        OutlinedButton(
+                            onClick = testViewModel::checkStorageStatus,
+                            modifier = Modifier.fillMaxWidth(),
+                            enabled = !isLoading,
+                        ) {
+                            Text("Consultar status")
+                        }
+                        OutlinedButton(
+                            onClick = testViewModel::removeStoredApiKey,
+                            modifier = Modifier.fillMaxWidth(),
+                            enabled = !isLoading,
+                        ) {
+                            Text("Remover chave armazenada")
                         }
                         TextButton(
                             onClick = testViewModel::clearResult,
@@ -130,30 +147,32 @@ fun CoinMarketCapTestScreen() {
 
             when (val currentState = state) {
                 CoinMarketCapTestUiState.Idle -> item {
-                    TestMessageCard(
-                        title = "Nenhum teste executado",
-                        message = "Use um dos botões acima para visualizar o retorno.",
-                    )
+                    TestMessageCard("Nenhum teste executado", "Escolha uma operação acima.")
                 }
-
-                is CoinMarketCapTestUiState.Loading -> item {
-                    LoadingCard(currentState.testName)
-                }
-
+                is CoinMarketCapTestUiState.Loading -> item { LoadingCard(currentState.testName) }
                 is CoinMarketCapTestUiState.Completed -> item {
+                    currentState.storageMessage?.let { message ->
+                        TestMessageCard(
+                            title = "Armazenamento seguro validado",
+                            message = message,
+                            statusColor = CryptoPositive,
+                            testName = currentState.testName,
+                        )
+                        Spacer(Modifier.height(13.dp))
+                    }
                     when (val result = currentState.result) {
-                        is ApiResult.Success -> SuccessResult(
-                            testName = currentState.testName,
-                            success = result,
-                        )
-
-                        is ApiResult.Failure -> FailureResult(
-                            testName = currentState.testName,
-                            failure = result,
-                        )
+                        is ApiResult.Success -> SuccessResult(currentState.testName, result)
+                        is ApiResult.Failure -> FailureResult(currentState.testName, result)
                     }
                 }
-
+                is CoinMarketCapTestUiState.StorageCompleted -> item {
+                    TestMessageCard(
+                        title = if (currentState.successful) "Operação concluída" else "Falha",
+                        message = currentState.message,
+                        statusColor = if (currentState.successful) CryptoPositive else CryptoNegative,
+                        testName = currentState.testName,
+                    )
+                }
                 is CoinMarketCapTestUiState.UnexpectedFailure -> item {
                     TestMessageCard(
                         title = "Falha inesperada",
@@ -166,7 +185,7 @@ fun CoinMarketCapTestScreen() {
 
             item {
                 Text(
-                    text = "Temporário: remova esta tela e a chave fixa antes de distribuir o aplicativo.",
+                    text = "Tela temporária de validação; será removida antes da distribuição.",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -193,61 +212,30 @@ private fun LoadingCard(testName: String) {
 }
 
 @Composable
-private fun SuccessResult(
-    testName: String,
-    success: ApiResult.Success<CoinMarketCapKeyInfo>,
-) {
+private fun SuccessResult(testName: String, success: ApiResult.Success<CoinMarketCapKeyInfo>) {
     Column(verticalArrangement = Arrangement.spacedBy(13.dp)) {
         TestMessageCard(
             title = "Sucesso",
-            message = "A API respondeu e o conteúdo foi convertido para o modelo de domínio.",
+            message = "A API aceitou a chave e retornou as informações da conta.",
             statusColor = CryptoPositive,
             testName = testName,
         )
-
-        OutlinedCard(Modifier.fillMaxWidth()) {
-            Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(9.dp)) {
-                Text("Metadados da resposta", style = MaterialTheme.typography.titleLarge)
-                InfoRow("Timestamp", success.metadata.timestamp.displayValue())
-                InfoRow("Tempo da API", success.metadata.elapsed?.let { "$it ms" }.displayValue())
-                InfoRow("Créditos consumidos", success.metadata.creditCount.displayValue())
-                InfoRow("Aviso", success.metadata.notice.displayValue())
-            }
-        }
-
         OutlinedCard(Modifier.fillMaxWidth()) {
             val plan = success.data.plan
-            Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(9.dp)) {
-                Text("Plano", style = MaterialTheme.typography.titleLarge)
-                InfoRow("Limite mensal", plan?.creditLimitMonthly.displayValue())
-                InfoRow("Limite por minuto", plan?.rateLimitMinute.displayValue())
-                InfoRow("Regra de renovação", plan?.creditLimitMonthlyReset.displayValue())
-                InfoRow("Próxima renovação", plan?.creditLimitMonthlyResetTimestamp.displayValue())
-            }
-        }
-
-        OutlinedCard(Modifier.fillMaxWidth()) {
             val usage = success.data.usage
             Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(9.dp)) {
-                Text("Uso", style = MaterialTheme.typography.titleLarge)
-                InfoRow("Requisições no minuto", usage?.currentMinute?.requestsMade.displayValue())
-                InfoRow("Restantes no minuto", usage?.currentMinute?.requestsLeft.displayValue())
-                InfoRow("Créditos usados no dia", usage?.currentDay?.creditsUsed.displayValue())
-                InfoRow("Créditos restantes no dia", usage?.currentDay?.creditsLeft.displayValue())
+                Text("Resumo seguro da resposta", style = MaterialTheme.typography.titleMedium)
+                InfoRow("Timestamp", success.metadata.timestamp.displayValue())
+                InfoRow("Créditos consumidos", success.metadata.creditCount.displayValue())
+                InfoRow("Limite mensal", plan?.creditLimitMonthly.displayValue())
                 InfoRow("Créditos usados no mês", usage?.currentMonth?.creditsUsed.displayValue())
-                InfoRow("Créditos restantes no mês", usage?.currentMonth?.creditsLeft.displayValue())
             }
         }
-
-        RawResultCard("Objeto retornado", "data=${success.data}\nmetadata=${success.metadata}")
     }
 }
 
 @Composable
-private fun FailureResult(
-    testName: String,
-    failure: ApiResult.Failure,
-) {
+private fun FailureResult(testName: String, failure: ApiResult.Failure) {
     Column(verticalArrangement = Arrangement.spacedBy(13.dp)) {
         TestMessageCard(
             title = "Falha",
@@ -268,7 +256,7 @@ private fun TestMessageCard(
 ) {
     OutlinedCard(Modifier.fillMaxWidth()) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(5.dp)) {
-            Text(title, style = MaterialTheme.typography.titleLarge, color = statusColor)
+            Text(title, style = MaterialTheme.typography.titleMedium, color = statusColor)
             testName?.let {
                 Text(it, style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.SemiBold)
             }
@@ -281,14 +269,10 @@ private fun TestMessageCard(
 private fun RawResultCard(title: String, value: String) {
     OutlinedCard(Modifier.fillMaxWidth()) {
         Column(Modifier.padding(16.dp)) {
-            Text(title, style = MaterialTheme.typography.titleLarge)
+            Text(title, style = MaterialTheme.typography.titleMedium)
             Spacer(Modifier.height(9.dp))
             SelectionContainer {
-                Text(
-                    text = value,
-                    style = MaterialTheme.typography.bodySmall,
-                    fontFamily = FontFamily.Monospace,
-                )
+                Text(value, style = MaterialTheme.typography.bodySmall, fontFamily = FontFamily.Monospace)
             }
         }
     }
@@ -307,12 +291,4 @@ private fun CryptoError.displayMessage(): String = when (this) {
     is CryptoError.Unknown -> detail ?: "Erro desconhecido."
 }
 
-private fun String.maskedApiKey(): String = when {
-    isEmpty() -> "Não configurada"
-    length <= API_KEY_VISIBLE_SUFFIX -> "••••"
-    else -> "••••••••${takeLast(API_KEY_VISIBLE_SUFFIX)}"
-}
-
 private fun Any?.displayValue(): String = this?.toString() ?: "—"
-
-private const val API_KEY_VISIBLE_SUFFIX = 4

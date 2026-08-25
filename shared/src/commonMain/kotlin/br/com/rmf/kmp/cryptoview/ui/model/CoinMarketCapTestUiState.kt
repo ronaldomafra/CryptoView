@@ -9,6 +9,13 @@ sealed interface CoinMarketCapTestUiState {
     data class Completed(
         val testName: String,
         val result: ApiResult<CoinMarketCapKeyInfo>,
+        val storageMessage: String? = null,
+    ) : CoinMarketCapTestUiState
+
+    data class StorageCompleted(
+        val testName: String,
+        val message: String,
+        val successful: Boolean,
     ) : CoinMarketCapTestUiState
 
     data class UnexpectedFailure(
