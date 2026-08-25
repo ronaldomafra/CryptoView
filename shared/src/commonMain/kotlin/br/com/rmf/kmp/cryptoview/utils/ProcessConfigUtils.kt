@@ -1,0 +1,48 @@
+package br.com.rmf.kmp.cryptoview.utils
+
+data class CryptoProcessConfig(
+    val networkParallelism: Int,
+    val networkPageSize: Int,
+    val responseBufferCapacity: Int,
+    val databaseWriteParallelism: Int,
+    val databaseBatchSize: Int,
+    val databasePoolSize: Int,
+    val databasePoolMaxSize: Int,
+    val databaseBusyTimeoutMillis: Long,
+    val walCheckpointEveryCommittedBatches: Int,
+    val connectTimeoutMillis: Long,
+    val requestTimeoutMillis: Long,
+    val socketTimeoutMillis: Long,
+    val maxRetryAttempts: Int,
+    val pollingIntervalMillis: Long,
+    val coinCacheTtlMillis: Long,
+    val exchangeCacheTtlMillis: Long,
+    val metadataCacheTtlMillis: Long,
+    val marketPairsCacheTtlMillis: Long,
+    val historyCacheTtlMillis: Long,
+)
+
+internal fun defaultCryptoProcessConfig(
+    databaseWriteParallelism: Int,
+    databasePoolSize: Int,
+): CryptoProcessConfig = CryptoProcessConfig(
+    networkParallelism = 10,
+    networkPageSize = 100,
+    responseBufferCapacity = 10,
+    databaseWriteParallelism = databaseWriteParallelism,
+    databaseBatchSize = 100,
+    databasePoolSize = databasePoolSize,
+    databasePoolMaxSize = 4,
+    databaseBusyTimeoutMillis = 5_000,
+    walCheckpointEveryCommittedBatches = 10,
+    connectTimeoutMillis = 10_000,
+    requestTimeoutMillis = 30_000,
+    socketTimeoutMillis = 30_000,
+    maxRetryAttempts = 3,
+    pollingIntervalMillis = 60_000,
+    coinCacheTtlMillis = 5 * 60_000,
+    exchangeCacheTtlMillis = 5 * 60_000,
+    metadataCacheTtlMillis = 24 * 60 * 60_000,
+    marketPairsCacheTtlMillis = 5 * 60_000,
+    historyCacheTtlMillis = 15 * 60_000,
+)

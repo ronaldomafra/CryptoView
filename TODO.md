@@ -20,15 +20,24 @@ Atualizar este arquivo ao concluir cada etapa. Itens marcados representam códig
 - [x] Layout adaptável com bottom bar/rail
 - [x] Refino de densidade: tipografia, ícones, cards e espaçamentos mais discretos
 - [x] Comparação visual fina com screenshots dos mockups
+- [x] Menu e tela temporária para testes da integração CoinMarketCap
 - [ ] Testes de UI e snapshots
 
 ## Core
 
-- [ ] Koin e composition roots
+- [x] Koin e composition roots
+- [x] ViewModel, Repository e UseCase registrados e compostos pelo Koin
 - [ ] Contrato `SecureApiKeyStorage`
 - [ ] Android Keystore + AES-GCM + DataStore
 - [ ] Swift Keychain em `iosApp`
-- [ ] Cliente Ktor/Ktorfit da CoinMarketCap
+- [x] Cliente Ktor/Ktorfit da CoinMarketCap
+- [x] Clientes HTTP por plataforma com `expect/actual` — CIO no Android e Darwin no iOS
+- [x] Service Ktorfit declarativo retornando `Flow<Response<...>>`
+- [x] Tratamento comum de resposta, erros HTTP, erros da API e cancelamento de coroutine
+- [x] Fluxo MVVM: UI → ViewModel → Repository → UseCase → Service
+- [x] Validação de parâmetros no UseCase antes da operação de rede
+- [x] Consulta `GET /v1/key/info` com conversão para modelos de domínio
+- [ ] Remover `TempUtils.API_KEY` e a tela temporária antes da distribuição
 - [ ] SQLDelight, WAL e pool de conexões
 - [ ] Repositórios local-first e políticas de cache
 - [ ] Sincronização, backpressure, retry e checkpoint
@@ -39,6 +48,9 @@ Atualizar este arquivo ao concluir cada etapa. Itens marcados representam códig
 - [x] Configurar Android SDK local
 - [x] Compilar Android
 - [x] Percorrer manualmente a navegação no dispositivo Android
+- [x] Validar manualmente a consulta CoinMarketCap pela tela temporária
+- [x] Compilar o código compartilhado para `iosSimulatorArm64`
 - [ ] Compilar framework iOS em macOS
-- [ ] Executar testes automatizados
+- [x] Executar testes automatizados
+- [x] Validar singleton do Repository e factories de ViewModel/UseCase no grafo Koin
 - [ ] Registrar benchmarks e documentação final
