@@ -8,6 +8,7 @@ plugins {
     alias(libs.plugins.kotlinSerialization)
     alias(libs.plugins.ksp)
     alias(libs.plugins.ktorfit)
+    alias(libs.plugins.sqldelight)
 }
 
 kotlin {
@@ -47,9 +48,11 @@ kotlin {
             implementation(libs.compose.uiToolingPreview)
             implementation(libs.compose.uiTooling)
             implementation(libs.ktor.client.cio)
+            implementation(libs.sqldelight.android.driver)
         }
         iosMain.dependencies {
             implementation(libs.ktor.client.darwin)
+            implementation(libs.sqldelight.native.driver)
         }
         commonMain.dependencies {
             implementation(libs.compose.runtime)
@@ -76,12 +79,25 @@ kotlin {
             implementation(libs.ktorfit.lib)
             implementation(libs.ktorfit.flow.converter)
             implementation(libs.ktorfit.response.converter)
+            implementation(libs.sqldelight.runtime)
+            implementation(libs.sqldelight.coroutines)
+            implementation(libs.coil.compose)
+            implementation(libs.coil.network.ktor3)
         }
         commonTest.dependencies {
             implementation(libs.kotlin.test)
             implementation(libs.koin.test)
             implementation(libs.kotlinx.coroutines.test)
             implementation(libs.ktor.client.mock)
+        }
+    }
+}
+
+sqldelight {
+    databases {
+        create("CryptoDatabase") {
+            packageName.set("br.com.rmf.kmp.cryptoview.database")
+            verifyMigrations.set(true)
         }
     }
 }

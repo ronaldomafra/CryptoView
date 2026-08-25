@@ -10,11 +10,15 @@ import org.koin.core.module.dsl.onClose
 import org.koin.core.module.dsl.withOptions
 import org.koin.dsl.module
 import platform.Foundation.NSLog
+import platform.Foundation.NSDate
 import platform.UIKit.UIDevice
 
 class IOSPlatform: Platform {
     override val name: String = UIDevice.currentDevice.systemName() + " " + UIDevice.currentDevice.systemVersion
 }
+
+actual fun currentTimeMillis(): Long =
+    (NSDate().timeIntervalSince1970 * 1_000.0).toLong()
 
 actual fun getPlatform(): Platform = IOSPlatform()
 

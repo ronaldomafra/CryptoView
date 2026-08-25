@@ -6,6 +6,24 @@
 > A gestão do histórico Git e da credencial anteriormente utilizada será feita
 > separadamente pelo responsável pelo projeto.
 
+## Status de execução — 25/08/2026
+
+Implementado e aprovado manualmente no Android e no iOS:
+
+- contrato compartilhado `SecureApiKeyStorage`;
+- envelope AES-256-GCM versionado;
+- persistência exclusiva do envelope no DataStore;
+- Android Keystore com chave AES não exportável;
+- provider Swift com CryptoKit e chave protegida pelo Keychain;
+- injeção dos providers nativos no Koin;
+- validação, gravação, leitura, consulta de status e remoção pela tela temporária;
+- testes compartilhados do contrato seguro.
+
+Este documento permanece como histórico das decisões. A criptografia não deve
+ser reimplementada no próximo recorte. Ainda falta integrar o componente já
+aprovado ao fluxo definitivo de inicialização, onboarding e Ajustes e, ao final,
+remover a tela temporária. A ordem detalhada está em `PROXIMOS_PASSOS.md`.
+
 ## 1. Decisão arquitetural
 
 - Implementar AES-256-GCM nas duas plataformas, mantendo o formato conceitual do
@@ -278,4 +296,3 @@ o usuário no onboarding e apresenta uma mensagem genérica de segurança.
   absoluta caso processo, Keychain e armazenamento local sejam comprometidos ao
   mesmo tempo.
 - Biometria e autenticação por usuário permanecem fora do escopo desta fase.
-

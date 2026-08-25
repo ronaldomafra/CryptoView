@@ -40,3 +40,5 @@ actual val platformModule = module {
         onClose { client -> client?.close() }
     }
 }
+
+actual fun currentTimeMillis(): Long = System.currentTimeMillis()

@@ -2,19 +2,41 @@ package br.com.rmf.kmp.cryptoview.di
 
 import br.com.rmf.kmp.cryptoview.data.api.CoinMarketCapRequestExecutor
 import br.com.rmf.kmp.cryptoview.data.api.CoinMarketCapService
+import br.com.rmf.kmp.cryptoview.data.api.ApiRateLimiter
+import br.com.rmf.kmp.cryptoview.data.api.AuthenticatedRequestExecutor
+import br.com.rmf.kmp.cryptoview.data.api.CoinMarketCapRemoteDataSource
 import br.com.rmf.kmp.cryptoview.data.api.createCoinMarketCapService
+import br.com.rmf.kmp.cryptoview.data.database.CryptoDatabaseDriverFactory
+import br.com.rmf.kmp.cryptoview.data.database.CryptoDatabasePool
+import br.com.rmf.kmp.cryptoview.data.database.MarketLocalDataSource
+import br.com.rmf.kmp.cryptoview.data.database.createConfiguredDriver
+import br.com.rmf.kmp.cryptoview.database.CryptoDatabase
+import br.com.rmf.kmp.cryptoview.domain.repository.MarketRepository
+import br.com.rmf.kmp.cryptoview.domain.sync.CryptoSyncManager
+import br.com.rmf.kmp.cryptoview.domain.sync.DefaultCryptoSyncManager
+import br.com.rmf.kmp.cryptoview.domain.sync.SyncCoinMetadataStep
+import br.com.rmf.kmp.cryptoview.domain.sync.SyncCoinsStep
+import br.com.rmf.kmp.cryptoview.domain.sync.SyncExchangeMetadataStep
+import br.com.rmf.kmp.cryptoview.domain.sync.SyncExchangesStep
 import br.com.rmf.kmp.cryptoview.domain.repository.CoinMarketCapDataRepository
 import br.com.rmf.kmp.cryptoview.domain.usecase.GetKeyInfoUseCase
 import br.com.rmf.kmp.cryptoview.security.DataStoreEncryptedApiKeyEnvelopeStore
 import br.com.rmf.kmp.cryptoview.security.DefaultSecureApiKeyStorage
 import br.com.rmf.kmp.cryptoview.security.EncryptedApiKeyEnvelopeStore
 import br.com.rmf.kmp.cryptoview.security.SecureApiKeyStorage
-import br.com.rmf.kmp.cryptoview.ui.viewmodel.CoinMarketCapTestViewModel
+import br.com.rmf.kmp.cryptoview.ui.viewmodel.AppViewModel
+import br.com.rmf.kmp.cryptoview.ui.viewmodel.ExchangeDetailViewModel
+import br.com.rmf.kmp.cryptoview.ui.viewmodel.MarketViewModel
+import br.com.rmf.kmp.cryptoview.ui.viewmodel.CoinMarketsViewModel
+import br.com.rmf.kmp.cryptoview.ui.viewmodel.SettingsViewModel
 import de.jensklingenberg.ktorfit.Ktorfit
 import de.jensklingenberg.ktorfit.converter.FlowConverterFactory
 import de.jensklingenberg.ktorfit.converter.ResponseConverterFactory
 import io.ktor.client.HttpClient
 import org.koin.dsl.module
+import app.cash.sqldelight.db.SqlDriver
+import org.koin.core.module.dsl.onClose
+import org.koin.core.module.dsl.withOptions
 
 internal const val COIN_MARKET_CAP_BASE_URL = "https://pro-api.coinmarketcap.com/"
 
@@ -31,12 +53,51 @@ internal val networkModule = module {
     }
     single<CoinMarketCapService> { get<Ktorfit>().createCoinMarketCapService() }
     single { CoinMarketCapRequestExecutor() }
+    single { AuthenticatedRequestExecutor(get()) }
+    single { ApiRateLimiter() }
+    single {
+        CoinMarketCapRemoteDataSource(
+            service = get(),
+            requestExecutor = get(),
+            authenticatedExecutor = get(),
+            rateLimiter = get(),
+            config = get(),
+        )
+    }
+}
+
+internal val databaseModule = module {
+    single<SqlDriver> {
+        get<CryptoDatabaseDriverFactory>().createConfiguredDriver(get())
+    } withOptions {
+        onClose { driver -> driver?.close() }
+    }
+    single { CryptoDatabase(get()) }
+    single { CryptoDatabasePool(get(), get()) }
+    single { MarketLocalDataSource(get(), get()) }
 }
 
 internal val repositoryModule = module {
     single {
         CoinMarketCapDataRepository(
             getKeyInfoUseCase = get(),
+        )
+    }
+    single { MarketRepository(local = get(), remote = get(), config = get()) }
+}
+
+internal val syncModule = module {
+    single { SyncExchangesStep(get(), get(), get()) }
+    single { SyncExchangeMetadataStep(get(), get(), get()) }
+    single { SyncCoinsStep(get(), get(), get()) }
+    single { SyncCoinMetadataStep(get(), get(), get()) }
+    single<CryptoSyncManager> {
+        DefaultCryptoSyncManager(
+            secureApiKeyStorage = get(),
+            remote = get(),
+            local = get(),
+            config = get(),
+            steps = listOf(get<SyncExchangesStep>(), get<SyncExchangeMetadataStep>(), get<SyncCoinsStep>(), get<SyncCoinMetadataStep>()),
         )
     }
 }
@@ -63,10 +124,9 @@ internal val securityModule = module {
 }
 
 internal val viewModelModule = module {
-    factory {
-        CoinMarketCapTestViewModel(
-            repository = get(),
-            secureApiKeyStorage = get(),
-        )
-    }
+    factory { AppViewModel(get(), get(), get(), get()) }
+    factory { MarketViewModel(get(), get(), get()) }
+    factory { ExchangeDetailViewModel(get()) }
+    factory { CoinMarketsViewModel(get()) }
+    factory { SettingsViewModel(get(), get()) }
 }

@@ -13,11 +13,9 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -26,6 +24,7 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -36,6 +35,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.viewmodel.compose.viewModel
+import br.com.rmf.kmp.cryptoview.domain.model.CoinMarketCapKeyInfo
+import br.com.rmf.kmp.cryptoview.domain.model.SyncStatus
 import br.com.rmf.kmp.cryptoview.ui.components.InfoRow
 import br.com.rmf.kmp.cryptoview.ui.components.OutlinedCard
 import br.com.rmf.kmp.cryptoview.ui.components.PrimaryActionButton
@@ -43,19 +46,30 @@ import br.com.rmf.kmp.cryptoview.ui.components.SettingsDivider
 import br.com.rmf.kmp.cryptoview.ui.components.SyncProgressContent
 import br.com.rmf.kmp.cryptoview.ui.theme.CryptoNegative
 import br.com.rmf.kmp.cryptoview.ui.theme.CryptoOrange
+import br.com.rmf.kmp.cryptoview.ui.viewmodel.SettingsViewModel
+import org.koin.mp.KoinPlatformTools
 
 @Composable
 fun SettingsScreen(
+    keyInfo: CoinMarketCapKeyInfo?,
+    validationMessage: String?,
+    onRevalidateKey: () -> Unit,
     onReplaceKey: () -> Unit,
     onRemoveKey: () -> Unit,
 ) {
-    var selectedCurrency by rememberSaveable { mutableStateOf("USD") }
-    var keyStatus by rememberSaveable { mutableStateOf("Validada há 2 min") }
+    val settingsViewModel = viewModel<SettingsViewModel> {
+        KoinPlatformTools.defaultContext().get().get<SettingsViewModel>()
+    }
+    val data by settingsViewModel.dataState.collectAsStateWithLifecycle()
+    val sync by settingsViewModel.syncState.collectAsStateWithLifecycle()
     var showSync by rememberSaveable { mutableStateOf(false) }
-    var showClearCache by rememberSaveable { mutableStateOf(false) }
+    var showClear by rememberSaveable { mutableStateOf(false) }
+    var showRemove by rememberSaveable { mutableStateOf(false) }
+
+    LaunchedEffect(sync.status) { if (sync.status == SyncStatus.RUNNING) showSync = true }
 
     Box(
-        modifier = Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing),
+        Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing),
         contentAlignment = Alignment.TopCenter,
     ) {
         LazyColumn(
@@ -63,47 +77,29 @@ fun SettingsScreen(
             contentPadding = PaddingValues(16.dp),
             verticalArrangement = Arrangement.spacedBy(13.dp),
         ) {
-            item {
-                Text("Ajustes", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
-            }
+            item { Text("Ajustes", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold) }
             item {
                 Text("API CoinMarketCap", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
                 Spacer(Modifier.height(8.dp))
                 OutlinedCard(Modifier.fillMaxWidth()) {
                     Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(11.dp)) {
-                        InfoRow("Status", "●  Configurada")
-                        InfoRow("Validação", keyStatus)
-                        InfoRow("Plano", "Basic · mock")
-                        InfoRow("Créditos usados", "1.248 de 15.000")
+                        InfoRow("Status", "Configurada com segurança")
+                        validationMessage?.let { InfoRow("Validação", it) }
+                        InfoRow("Limite mensal", keyInfo?.plan?.creditLimitMonthly?.toString() ?: "Consultar novamente")
+                        InfoRow("Créditos usados", keyInfo?.usage?.currentMonth?.creditsUsed?.toString() ?: "—")
+                        InfoRow("Créditos restantes", keyInfo?.usage?.currentMonth?.creditsLeft?.toString() ?: "—")
+                        InfoRow("Requisições/min", keyInfo?.plan?.rateLimitMinute?.toString() ?: "—")
                         SettingsDivider()
                         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            OutlinedButton(onClick = { keyStatus = "Validada agora" }, modifier = Modifier.weight(1f)) {
-                                Text("Validar novamente")
-                            }
-                            OutlinedButton(onClick = onReplaceKey, modifier = Modifier.weight(1f)) {
-                                Text("Substituir")
-                            }
+                            OutlinedButton(onClick = onRevalidateKey, modifier = Modifier.weight(1f)) { Text("Validar") }
+                            OutlinedButton(onClick = onReplaceKey, modifier = Modifier.weight(1f)) { Text("Substituir") }
                         }
                         Text(
                             "Remover API key",
-                            modifier = Modifier.clickable(onClick = onRemoveKey).padding(vertical = 8.dp),
+                            modifier = Modifier.clickable { showRemove = true }.padding(vertical = 8.dp),
                             color = CryptoNegative,
                             fontWeight = FontWeight.SemiBold,
                         )
-                    }
-                }
-            }
-            item {
-                Text("Moeda de exibição", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-                Spacer(Modifier.height(8.dp))
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    listOf("USD", "BRL", "EUR").forEach { currency ->
-                        OutlinedButton(
-                            onClick = { selectedCurrency = currency },
-                            modifier = Modifier.weight(1f),
-                        ) {
-                            Text(currency, color = if (selectedCurrency == currency) CryptoOrange else MaterialTheme.colorScheme.onSurface)
-                        }
                     }
                 }
             }
@@ -112,17 +108,24 @@ fun SettingsScreen(
                 Spacer(Modifier.height(8.dp))
                 OutlinedCard(Modifier.fillMaxWidth()) {
                     Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(11.dp)) {
-                        InfoRow("Última sincronização", "Hoje, 09:40")
-                        InfoRow("Moedas salvas", "1.000")
-                        InfoRow("Corretoras salvas", "246")
+                        InfoRow("Moedas salvas", data.coinCount.toString())
+                        InfoRow("Corretoras salvas", data.exchangeCount.toString())
+                        InfoRow("Estado", sync.message ?: "Pronto")
                         Text(
-                            "A moeda expandida atualiza a cada 60 segundos enquanto esta tela estiver ativa.",
+                            "O histórico e os mercados são baixados somente ao abrir uma moeda. A cotação aberta é atualizada a cada 60 segundos.",
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
-                        PrimaryActionButton("Sincronizar agora", { showSync = true }, Modifier.fillMaxWidth())
+                        PrimaryActionButton(
+                            "Sincronizar agora",
+                            onClick = {
+                                settingsViewModel.synchronize()
+                                showSync = true
+                            },
+                            modifier = Modifier.fillMaxWidth(),
+                        )
                         Text(
-                            "Limpar cache local",
-                            modifier = Modifier.clickable { showClearCache = true }.padding(vertical = 8.dp),
+                            if (data.clearing) "Limpando…" else "Limpar cache local",
+                            modifier = Modifier.clickable(enabled = !data.clearing) { showClear = true }.padding(vertical = 8.dp),
                             color = CryptoOrange,
                             fontWeight = FontWeight.SemiBold,
                         )
@@ -131,36 +134,57 @@ fun SettingsScreen(
             }
         }
 
-        if (showSync) {
-            Dialog(
-                onDismissRequest = { showSync = false },
-                properties = DialogProperties(usePlatformDefaultWidth = false),
+        if (showSync) Dialog(
+            onDismissRequest = { showSync = false },
+            properties = DialogProperties(usePlatformDefaultWidth = false),
+        ) {
+            Card(
+                modifier = Modifier.fillMaxWidth(.88f).widthIn(max = 440.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
             ) {
-                Card(
-                    modifier = Modifier.fillMaxWidth(.88f).widthIn(max = 440.dp),
-                    shape = RoundedCornerShape(18.dp),
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                ) {
-                    SyncProgressContent(
-                        onBackground = { showSync = false },
-                        onCancel = { showSync = false },
-                    )
-                }
+                SyncProgressContent(
+                    progress = sync,
+                    onBackground = { showSync = false },
+                    onCancel = settingsViewModel::cancelSync,
+                    onResume = settingsViewModel::resumeSync,
+                )
             }
         }
-
-        if (showClearCache) {
-            AlertDialog(
-                onDismissRequest = { showClearCache = false },
-                title = { Text("Limpar cache local?") },
-                text = { Text("Os dados mockados serão recarregados quando o mercado for aberto novamente.") },
-                confirmButton = {
-                    TextButton(onClick = { showClearCache = false }) { Text("Limpar", color = CryptoNegative) }
-                },
-                dismissButton = {
-                    TextButton(onClick = { showClearCache = false }) { Text("Cancelar") }
-                },
-            )
-        }
     }
+
+    if (showClear) ConfirmDialog(
+        title = "Limpar cache local?",
+        message = "Moedas, corretoras, históricos e checkpoints serão removidos. A API key protegida será mantida.",
+        confirm = "Limpar",
+        onConfirm = {
+            showClear = false
+            settingsViewModel.clearCache()
+        },
+        onDismiss = { showClear = false },
+    )
+    if (showRemove) ConfirmDialog(
+        title = "Remover API key?",
+        message = "A credencial protegida será removida deste dispositivo.",
+        confirm = "Remover",
+        onConfirm = {
+            showRemove = false
+            onRemoveKey()
+        },
+        onDismiss = { showRemove = false },
+    )
 }
+
+@Composable
+private fun ConfirmDialog(
+    title: String,
+    message: String,
+    confirm: String,
+    onConfirm: () -> Unit,
+    onDismiss: () -> Unit,
+) = AlertDialog(
+    onDismissRequest = onDismiss,
+    title = { Text(title) },
+    text = { Text(message) },
+    confirmButton = { TextButton(onClick = onConfirm) { Text(confirm, color = CryptoNegative) } },
+    dismissButton = { TextButton(onClick = onDismiss) { Text("Cancelar") } },
+)

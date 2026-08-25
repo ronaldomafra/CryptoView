@@ -14,8 +14,10 @@ internal fun initKoin(additionalModules: List<Module>) {
                 platformModule,
                 securityModule,
                 networkModule,
+                databaseModule,
                 repositoryModule,
                 useCaseModule,
+                syncModule,
                 viewModelModule,
             ) + additionalModules,
         )

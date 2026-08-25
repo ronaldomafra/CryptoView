@@ -5,6 +5,8 @@ import androidx.datastore.core.okio.OkioStorage
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.PreferencesSerializer
 import br.com.rmf.kmp.cryptoview.security.AndroidPlatformApiKeyCipher
+import br.com.rmf.kmp.cryptoview.data.database.AndroidCryptoDatabaseDriverFactory
+import br.com.rmf.kmp.cryptoview.data.database.CryptoDatabaseDriverFactory
 import br.com.rmf.kmp.cryptoview.security.PlatformApiKeyCipher
 import br.com.rmf.kmp.cryptoview.security.SECURE_DATA_STORE_FILE_NAME
 import br.com.rmf.kmp.cryptoview.security.createSecureDataStore
@@ -16,6 +18,9 @@ fun initKoinAndroid(context: Context) {
     val applicationContext = context.applicationContext
     val androidSecurityModule = module {
         single<PlatformApiKeyCipher> { AndroidPlatformApiKeyCipher() }
+        single<CryptoDatabaseDriverFactory> {
+            AndroidCryptoDatabaseDriverFactory(applicationContext)
+        }
         single {
             createSecureDataStore(
                 storage = OkioStorage<Preferences>(

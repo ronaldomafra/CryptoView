@@ -1,0 +1,425 @@
+CREATE TABLE coin (
+    id INTEGER NOT NULL PRIMARY KEY,
+    name TEXT NOT NULL,
+    normalizedName TEXT NOT NULL,
+    symbol TEXT NOT NULL,
+    slug TEXT NOT NULL,
+    rank INTEGER,
+    numMarketPairs INTEGER,
+    circulatingSupply REAL,
+    totalSupply REAL,
+    maxSupply REAL,
+    dateAdded TEXT,
+    remoteUpdatedAt TEXT,
+    lastSeenRunId TEXT NOT NULL,
+    active INTEGER NOT NULL DEFAULT 1
+);
+
+CREATE INDEX coin_rank_index ON coin(rank);
+CREATE INDEX coin_normalized_name_index ON coin(normalizedName);
+CREATE INDEX coin_symbol_index ON coin(symbol);
+
+CREATE TABLE coin_quote (
+    coinId INTEGER NOT NULL PRIMARY KEY REFERENCES coin(id) ON DELETE CASCADE,
+    price REAL,
+    volume24h REAL,
+    percentChange24h REAL,
+    marketCap REAL,
+    remoteUpdatedAt TEXT,
+    fetchedAt INTEGER NOT NULL
+);
+
+CREATE INDEX coin_quote_price_index ON coin_quote(price);
+CREATE INDEX coin_quote_change_index ON coin_quote(percentChange24h);
+
+CREATE TABLE coin_metadata (
+    coinId INTEGER NOT NULL PRIMARY KEY REFERENCES coin(id) ON DELETE CASCADE,
+    logoUrl TEXT,
+    description TEXT,
+    websiteUrl TEXT,
+    fetchedAt INTEGER NOT NULL
+);
+
+CREATE TABLE market_exchange (
+    id INTEGER NOT NULL PRIMARY KEY,
+    name TEXT NOT NULL,
+    normalizedName TEXT NOT NULL,
+    slug TEXT NOT NULL,
+    rank INTEGER,
+    numMarketPairs INTEGER,
+    spotVolumeUsd REAL,
+    dateLaunched TEXT,
+    remoteUpdatedAt TEXT,
+    lastSeenRunId TEXT NOT NULL,
+    active INTEGER NOT NULL DEFAULT 1
+);
+
+CREATE INDEX exchange_rank_index ON market_exchange(rank);
+CREATE INDEX exchange_normalized_name_index ON market_exchange(normalizedName);
+
+CREATE TABLE exchange_metadata (
+    exchangeId INTEGER NOT NULL PRIMARY KEY REFERENCES market_exchange(id) ON DELETE CASCADE,
+    logoUrl TEXT,
+    description TEXT,
+    websiteUrl TEXT,
+    makerFee REAL,
+    takerFee REAL,
+    dateLaunched TEXT,
+    fetchedAt INTEGER NOT NULL
+);
+
+CREATE TABLE exchange_asset (
+    exchangeId INTEGER NOT NULL REFERENCES market_exchange(id) ON DELETE CASCADE,
+    currencyId INTEGER NOT NULL,
+    name TEXT NOT NULL,
+    symbol TEXT NOT NULL,
+    priceUsd REAL,
+    balance REAL,
+    valueUsd REAL,
+    fetchedAt INTEGER NOT NULL,
+    PRIMARY KEY(exchangeId, currencyId)
+);
+
+CREATE INDEX exchange_asset_exchange_index ON exchange_asset(exchangeId);
+
+CREATE TABLE coin_exchange_market (
+    coinId INTEGER NOT NULL REFERENCES coin(id) ON DELETE CASCADE,
+    exchangeId INTEGER NOT NULL REFERENCES market_exchange(id) ON DELETE CASCADE,
+    marketPair TEXT NOT NULL,
+    category TEXT,
+    priceUsd REAL,
+    volume24hUsd REAL,
+    remoteUpdatedAt TEXT,
+    fetchedAt INTEGER NOT NULL,
+    PRIMARY KEY(coinId, exchangeId, marketPair)
+);
+
+CREATE INDEX coin_market_coin_index ON coin_exchange_market(coinId);
+CREATE INDEX coin_market_exchange_index ON coin_exchange_market(exchangeId);
+
+CREATE TABLE coin_history_point (
+    coinId INTEGER NOT NULL REFERENCES coin(id) ON DELETE CASCADE,
+    timestamp TEXT NOT NULL,
+    priceUsd REAL NOT NULL,
+    fetchedAt INTEGER NOT NULL,
+    PRIMARY KEY(coinId, timestamp)
+);
+
+CREATE INDEX coin_history_coin_index ON coin_history_point(coinId, timestamp);
+
+CREATE TABLE resource_cache_state (
+    resourceKey TEXT NOT NULL PRIMARY KEY,
+    lastSuccessAt INTEGER,
+    lastAttemptAt INTEGER,
+    status TEXT NOT NULL,
+    errorCode TEXT
+);
+
+CREATE TABLE sync_run (
+    runId TEXT NOT NULL PRIMARY KEY,
+    trigger TEXT NOT NULL,
+    phase TEXT NOT NULL,
+    status TEXT NOT NULL,
+    plannedItems INTEGER,
+    persistedItems INTEGER NOT NULL DEFAULT 0,
+    requestedPages INTEGER NOT NULL DEFAULT 0,
+    committedPages INTEGER NOT NULL DEFAULT 0,
+    failedPages INTEGER NOT NULL DEFAULT 0,
+    startedAt INTEGER NOT NULL,
+    updatedAt INTEGER NOT NULL,
+    completedAt INTEGER,
+    errorCode TEXT
+);
+
+CREATE TABLE sync_step_checkpoint (
+    runId TEXT NOT NULL REFERENCES sync_run(runId) ON DELETE CASCADE,
+    phase TEXT NOT NULL,
+    page INTEGER NOT NULL,
+    status TEXT NOT NULL,
+    persistedItems INTEGER NOT NULL DEFAULT 0,
+    updatedAt INTEGER NOT NULL,
+    PRIMARY KEY(runId, phase, page)
+);
+
+insertCoinIfMissing:
+INSERT OR IGNORE INTO coin(
+    id, name, normalizedName, symbol, slug, rank, numMarketPairs,
+    circulatingSupply, totalSupply, maxSupply, dateAdded, remoteUpdatedAt,
+    lastSeenRunId, active
+) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1);
+
+updateCoin:
+UPDATE coin SET
+    name = ?,
+    normalizedName = ?,
+    symbol = ?,
+    slug = ?,
+    rank = ?,
+    numMarketPairs = ?,
+    circulatingSupply = ?,
+    totalSupply = ?,
+    maxSupply = ?,
+    dateAdded = ?,
+    remoteUpdatedAt = ?,
+    lastSeenRunId = ?,
+    active = 1
+WHERE id = ?;
+
+replaceCoinQuote:
+INSERT OR REPLACE INTO coin_quote(
+    coinId, price, volume24h, percentChange24h, marketCap, remoteUpdatedAt, fetchedAt
+) VALUES (?, ?, ?, ?, ?, ?, ?);
+
+replaceCoinMetadata:
+INSERT OR REPLACE INTO coin_metadata(
+    coinId, logoUrl, description, websiteUrl, fetchedAt
+) VALUES (?, ?, ?, ?, ?);
+
+selectCoins:
+SELECT
+    c.id,
+    c.name,
+    c.symbol,
+    c.slug,
+    c.rank,
+    c.numMarketPairs,
+    q.price,
+    q.volume24h,
+    q.percentChange24h,
+    q.marketCap,
+    q.remoteUpdatedAt AS quoteUpdatedAt,
+    m.logoUrl,
+    (SELECT COUNT(*) FROM coin_exchange_market cm WHERE cm.coinId = c.id) AS cachedExchangeCount
+FROM coin c
+LEFT JOIN coin_quote q ON q.coinId = c.id
+LEFT JOIN coin_metadata m ON m.coinId = c.id
+WHERE c.active = 1
+  AND (:query = '' OR c.normalizedName LIKE :queryLike OR c.symbol LIKE :queryLike)
+ORDER BY CASE WHEN c.rank IS NULL THEN 1 ELSE 0 END, c.rank ASC, c.name ASC
+LIMIT :limit OFFSET :offset;
+
+selectCoinById:
+SELECT
+    c.id,
+    c.name,
+    c.symbol,
+    c.slug,
+    c.rank,
+    c.numMarketPairs,
+    q.price,
+    q.volume24h,
+    q.percentChange24h,
+    q.marketCap,
+    q.remoteUpdatedAt AS quoteUpdatedAt,
+    m.logoUrl,
+    m.description,
+    m.websiteUrl
+FROM coin c
+LEFT JOIN coin_quote q ON q.coinId = c.id
+LEFT JOIN coin_metadata m ON m.coinId = c.id
+WHERE c.id = ?;
+
+selectCoinIdsMissingMetadata:
+SELECT c.id
+FROM coin c
+LEFT JOIN coin_metadata m ON m.coinId = c.id
+WHERE c.active = 1 AND (m.coinId IS NULL OR m.fetchedAt < :minimumFetchedAt)
+ORDER BY c.rank ASC
+LIMIT :limit OFFSET :offset;
+
+countCoins:
+SELECT COUNT(*) FROM coin WHERE active = 1;
+
+markCoinsInactiveOutsideRun:
+UPDATE coin SET active = 0 WHERE lastSeenRunId != ?;
+
+insertExchangeIfMissing:
+INSERT OR IGNORE INTO market_exchange(
+    id, name, normalizedName, slug, rank, numMarketPairs, spotVolumeUsd,
+    dateLaunched, remoteUpdatedAt, lastSeenRunId, active
+) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1);
+
+updateExchange:
+UPDATE market_exchange SET
+    name = ?,
+    normalizedName = ?,
+    slug = ?,
+    rank = ?,
+    numMarketPairs = ?,
+    spotVolumeUsd = ?,
+    dateLaunched = ?,
+    remoteUpdatedAt = ?,
+    lastSeenRunId = ?,
+    active = 1
+WHERE id = ?;
+
+replaceExchangeMetadata:
+INSERT OR REPLACE INTO exchange_metadata(
+    exchangeId, logoUrl, description, websiteUrl, makerFee, takerFee, dateLaunched, fetchedAt
+) VALUES (?, ?, ?, ?, ?, ?, ?, ?);
+
+selectExchanges:
+SELECT
+    e.id,
+    e.name,
+    e.slug,
+    e.rank,
+    e.numMarketPairs,
+    e.spotVolumeUsd,
+    COALESCE(m.dateLaunched, e.dateLaunched) AS resolvedDateLaunched,
+    m.logoUrl,
+    m.description,
+    m.websiteUrl,
+    m.makerFee,
+    m.takerFee
+FROM market_exchange e
+LEFT JOIN exchange_metadata m ON m.exchangeId = e.id
+WHERE e.active = 1
+  AND (:query = '' OR e.normalizedName LIKE :queryLike)
+ORDER BY CASE WHEN e.rank IS NULL THEN 1 ELSE 0 END, e.rank ASC, e.name ASC
+LIMIT :limit OFFSET :offset;
+
+selectExchangeById:
+SELECT
+    e.id,
+    e.name,
+    e.slug,
+    e.rank,
+    e.numMarketPairs,
+    e.spotVolumeUsd,
+    COALESCE(m.dateLaunched, e.dateLaunched) AS resolvedDateLaunched,
+    m.logoUrl,
+    m.description,
+    m.websiteUrl,
+    m.makerFee,
+    m.takerFee
+FROM market_exchange e
+LEFT JOIN exchange_metadata m ON m.exchangeId = e.id
+WHERE e.id = ?;
+
+selectExchangeIdsMissingMetadata:
+SELECT e.id
+FROM market_exchange e
+LEFT JOIN exchange_metadata m ON m.exchangeId = e.id
+WHERE e.active = 1 AND (m.exchangeId IS NULL OR m.fetchedAt < :minimumFetchedAt)
+ORDER BY e.rank ASC
+LIMIT :limit OFFSET :offset;
+
+countExchanges:
+SELECT COUNT(*) FROM market_exchange WHERE active = 1;
+
+markExchangesInactiveOutsideRun:
+UPDATE market_exchange SET active = 0 WHERE lastSeenRunId != ?;
+
+replaceExchangeAsset:
+INSERT OR REPLACE INTO exchange_asset(
+    exchangeId, currencyId, name, symbol, priceUsd, balance, valueUsd, fetchedAt
+) VALUES (?, ?, ?, ?, ?, ?, ?, ?);
+
+deleteExchangeAssets:
+DELETE FROM exchange_asset WHERE exchangeId = ?;
+
+selectExchangeAssets:
+SELECT * FROM exchange_asset WHERE exchangeId = ? ORDER BY valueUsd DESC;
+
+replaceCoinExchangeMarket:
+INSERT OR REPLACE INTO coin_exchange_market(
+    coinId, exchangeId, marketPair, category, priceUsd, volume24hUsd,
+    remoteUpdatedAt, fetchedAt
+) VALUES (?, ?, ?, ?, ?, ?, ?, ?);
+
+deleteCoinMarkets:
+DELETE FROM coin_exchange_market WHERE coinId = ?;
+
+selectCoinMarkets:
+SELECT
+    cm.coinId,
+    cm.exchangeId,
+    e.name AS exchangeName,
+    em.logoUrl AS exchangeLogoUrl,
+    cm.marketPair,
+    cm.category,
+    cm.priceUsd,
+    cm.volume24hUsd,
+    cm.remoteUpdatedAt
+FROM coin_exchange_market cm
+JOIN market_exchange e ON e.id = cm.exchangeId
+LEFT JOIN exchange_metadata em ON em.exchangeId = e.id
+WHERE cm.coinId = ?
+ORDER BY cm.volume24hUsd DESC;
+
+replaceHistoryPoint:
+INSERT OR REPLACE INTO coin_history_point(coinId, timestamp, priceUsd, fetchedAt)
+VALUES (?, ?, ?, ?);
+
+deleteCoinHistory:
+DELETE FROM coin_history_point WHERE coinId = ?;
+
+selectCoinHistory:
+SELECT * FROM coin_history_point WHERE coinId = ? ORDER BY timestamp ASC;
+
+upsertResourceState:
+INSERT OR REPLACE INTO resource_cache_state(
+    resourceKey, lastSuccessAt, lastAttemptAt, status, errorCode
+) VALUES (?, ?, ?, ?, ?);
+
+selectResourceState:
+SELECT * FROM resource_cache_state WHERE resourceKey = ?;
+
+insertSyncRun:
+INSERT OR REPLACE INTO sync_run(
+    runId, trigger, phase, status, plannedItems, persistedItems,
+    requestedPages, committedPages, failedPages, startedAt, updatedAt,
+    completedAt, errorCode
+) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+
+updateSyncRunProgress:
+UPDATE sync_run SET
+    phase = ?, status = ?, plannedItems = ?, persistedItems = ?,
+    requestedPages = ?, committedPages = ?, failedPages = ?, updatedAt = ?,
+    completedAt = ?, errorCode = ?
+WHERE runId = ?;
+
+selectLatestIncompleteRun:
+SELECT * FROM sync_run
+WHERE status IN ('RUNNING', 'PAUSED', 'FAILED')
+ORDER BY startedAt DESC LIMIT 1;
+
+selectLatestRun:
+SELECT * FROM sync_run ORDER BY startedAt DESC LIMIT 1;
+
+replaceCheckpoint:
+INSERT OR REPLACE INTO sync_step_checkpoint(
+    runId, phase, page, status, persistedItems, updatedAt
+) VALUES (?, ?, ?, ?, ?, ?);
+
+selectCommittedPages:
+SELECT page FROM sync_step_checkpoint
+WHERE runId = ? AND phase = ? AND status = 'COMMITTED'
+ORDER BY page;
+
+deleteRunCheckpoints:
+DELETE FROM sync_step_checkpoint WHERE runId = ?;
+
+clearHistory:
+DELETE FROM coin_history_point;
+clearMarkets:
+DELETE FROM coin_exchange_market;
+clearAssets:
+DELETE FROM exchange_asset;
+clearCoinMetadata:
+DELETE FROM coin_metadata;
+clearCoinQuotes:
+DELETE FROM coin_quote;
+clearExchangeMetadata:
+DELETE FROM exchange_metadata;
+clearCoins:
+DELETE FROM coin;
+clearExchanges:
+DELETE FROM market_exchange;
+clearCheckpoints:
+DELETE FROM sync_step_checkpoint;
+clearRuns:
+DELETE FROM sync_run;
+clearResourceStates:
+DELETE FROM resource_cache_state;

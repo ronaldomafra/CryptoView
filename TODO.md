@@ -1,59 +1,70 @@
 # CryptoView — checklist de desenvolvimento
 
-Atualizar este arquivo ao concluir cada etapa. Itens marcados representam código implementado; validações por build permanecem separadas.
+Checkpoint atualizado em 25/08/2026. A marcação indica código implementado; validações manuais continuam separadas.
 
-## UI mockada
+## Tasks
 
-- [x] Tema e tokens visuais do CryptoView
-- [x] Modelos e fixtures para moedas, corretoras e ativos
-- [x] Onboarding com campo protegido e entrada no app
-- [x] Navegação principal Mercado/Ajustes
-- [x] Navegação interna com retorno e back stacks independentes
-- [x] Mercado com tabs Moedas/Corretoras
-- [x] Busca local e painel de filtros interativos
-- [x] Cards de moedas com expansão exclusiva
-- [x] Gráfico mockado de 24 horas
-- [x] Lista e detalhe de corretoras
-- [x] Lista de mercados de uma moeda
-- [x] Tela de Ajustes
-- [x] Modal de sincronização com ações
-- [x] Layout adaptável com bottom bar/rail
-- [x] Refino de densidade: tipografia, ícones, cards e espaçamentos mais discretos
-- [x] Comparação visual fina com screenshots dos mockups
-- [x] Menu e tela temporária para testes da integração CoinMarketCap
-- [ ] Testes de UI e snapshots
+- [x] Integrar o armazenamento seguro ao estado raiz, onboarding e ajustes
+- [x] Remover o destino temporário `Testes` da navegação
+- [x] Manter somente `Mercado` e `Ajustes` como destinos principais
+- [x] Criar configuração central de rede, cache, banco e polling
+- [x] Criar sincronização em etapas com validação, cancelamento e retomada
+- [x] Persistir checkpoints por página confirmada
+- [x] Respeitar a reserva de cota nas etapas não essenciais
+- [x] Salvar moedas e corretoras incrementalmente durante o download
+- [ ] Validar o fluxo completo com uma chave e plano reais nas duas plataformas
+
+## UI
+
+- [x] Onboarding valida e salva a chave antes de liberar o app
+- [x] Mercado observa moedas e corretoras do SQLDelight
+- [x] Busca local sobre o banco
+- [x] Expansão exclusiva de moeda com cotação, gráfico e mercados
+- [x] Modal exibe o progresso real confirmado pelo banco
+- [x] Detalhe da corretora carrega ativos por demanda
+- [x] Ajustes exibe uso da API, sincronização, substituição, remoção e limpeza de cache
+- [x] Logos remotos possuem fallback local discreto
+- [x] Layout adaptável com barra inferior ou rail
+- [ ] Restaurar e finalizar filtros locais de preço, variação e corretora
+- [ ] Revisão visual e acessibilidade em tamanhos Android/iOS reais
 
 ## Core
 
-- [x] Koin e composition roots
-- [x] ViewModel, Repository e UseCase registrados e compostos pelo Koin
-- [x] Contrato `SecureApiKeyStorage`
-- [x] Android Keystore + AES-GCM + DataStore
-- [x] Swift CryptoKit + Keychain em `iosApp`, sem CocoaPods
-- [x] Cliente Ktor/Ktorfit da CoinMarketCap
-- [x] Clientes HTTP por plataforma com `expect/actual` — CIO no Android e Darwin no iOS
-- [x] Service Ktorfit declarativo retornando `Flow<Response<...>>`
-- [x] Tratamento comum de resposta, erros HTTP, erros da API e cancelamento de coroutine
-- [x] Fluxo MVVM: UI → ViewModel → Repository → UseCase → Service
-- [x] Validação de parâmetros no UseCase antes da operação de rede
-- [x] Consulta `GET /v1/key/info` com conversão para modelos de domínio
-- [x] Remover `TempUtils.API_KEY` fixa do código
-- [x] Integrar salvar/ler/status/remover à tela temporária de testes
-- [ ] Remover a tela temporária antes da distribuição
-- [ ] SQLDelight, WAL e pool de conexões
-- [ ] Repositórios local-first e políticas de cache
-- [ ] Sincronização, backpressure, retry e checkpoint
-- [ ] Polling real da moeda expandida
+- [x] Android Keystore + AES-256-GCM + DataStore
+- [x] iOS Swift CryptoKit + Keychain, sem CocoaPods
+- [x] API key descriptografada somente no limite da requisição autenticada
+- [x] Endpoints de chave, métricas, moedas, metadados, cotações, histórico, mercados, corretoras e ativos
+- [x] SQLDelight como fonte de verdade local
+- [x] Índices, WAL, `busy_timeout` e pool controlado por `Semaphore`/`Mutex`
+- [x] Upsert seguro de entidades-pai e `INSERT OR REPLACE` para snapshots
+- [x] Páginas paralelas com buffer/backpressure e batch transacional
+- [x] Retry limitado para erros transitórios e suporte a `Retry-After`
+- [x] Sincronização inicial completa até a última página disponível
+- [x] Startup atualiza somente corretoras essenciais quando o cache expirou
+- [x] Metadados de moedas/corretoras em lote
+- [x] Histórico, mercados e ativos fora da sincronização global
+- [x] Polling de 60 segundos somente para a moeda expandida
+- [ ] Instrumentar métricas e executar benchmark pool 1×2 e paralelismo 1×5×10
+- [ ] Avaliar um tratamento explícito de lifecycle/background além da saída da composição
 
-## Validação
+## Tests e validação
 
-- [x] Configurar Android SDK local
-- [x] Compilar Android
-- [x] Percorrer manualmente a navegação no dispositivo Android
-- [x] Validar manualmente a consulta CoinMarketCap pela tela temporária
-- [x] Compilar o código compartilhado para `iosSimulatorArm64`
-- [ ] Compilar framework iOS em macOS
-- [x] Executar testes automatizados
-- [x] Testar contrato seguro: round-trip, falhas, recuperação e remoção
-- [x] Validar singleton do Repository e factories de ViewModel/UseCase no grafo Koin
-- [ ] Registrar benchmarks e documentação final
+- [x] Testes de armazenamento seguro e consulta de chave
+- [x] Testes de parsing das duas formas de cotação USD
+- [x] Testes de reserva de cota e percentual de progresso
+- [x] Teste Android host: 20 testes aprovados em 25/08/2026
+- [x] Compilação `:shared:compileAndroidMain` aprovada
+- [ ] Testes do banco: upsert, rollback, FK, retomada e múltiplas conexões
+- [ ] Testes do coordenador: paralelismo, backpressure, retry, cancelamento e checkpoint
+- [ ] Testes de ViewModel: startup, polling, troca rápida e erros independentes
+- [ ] Testes Compose das telas e snapshots
+- [ ] Revalidar target e testes iOS em macOS/Xcode após esta integração
+- [x] Executar build completo `:androidApp:assembleDebug`
+- [ ] Executar roteiro manual Android com dados reais
+
+## Próximo recorte recomendado
+
+1. Testes determinísticos do banco e do sincronizador com drivers/fakes.
+2. Roteiro manual de sincronização real, incluindo plano Basic/403 e retomada.
+3. Filtros locais e estados offline/desatualizado na UI.
+4. Benchmark, acessibilidade, CI e documentação final de entrega.

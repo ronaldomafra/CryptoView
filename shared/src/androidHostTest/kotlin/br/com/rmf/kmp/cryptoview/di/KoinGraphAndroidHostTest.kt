@@ -2,7 +2,6 @@ package br.com.rmf.kmp.cryptoview.di
 
 import br.com.rmf.kmp.cryptoview.domain.repository.CoinMarketCapDataRepository
 import br.com.rmf.kmp.cryptoview.domain.usecase.GetKeyInfoUseCase
-import br.com.rmf.kmp.cryptoview.ui.viewmodel.CoinMarketCapTestViewModel
 import br.com.rmf.kmp.cryptoview.utils.CryptoProcessConfig
 import br.com.rmf.kmp.cryptoview.security.SecureApiKeyResult
 import br.com.rmf.kmp.cryptoview.security.SecureApiKeyError
@@ -35,11 +34,6 @@ class KoinGraphAndroidHostTest {
                 koin.get<CoinMarketCapDataRepository>(),
             )
             assertNotSame(koin.get<GetKeyInfoUseCase>(), koin.get<GetKeyInfoUseCase>())
-            assertNotSame(
-                koin.get<CoinMarketCapTestViewModel>(),
-                koin.get<CoinMarketCapTestViewModel>(),
-            )
-
             val config = koin.get<CryptoProcessConfig>()
             assertEquals(2, config.databasePoolSize)
             assertEquals(2, config.databaseWriteParallelism)

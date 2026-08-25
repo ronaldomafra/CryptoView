@@ -1,10 +1,36 @@
-# CryptoView — pacote de especificação
+# CryptoView — pacote de especificação e implementação
 
-Este pacote contém a especificação final e os mockups aprovados para o desafio técnico CryptoView.
+Aplicativo Kotlin Multiplatform/Compose Multiplatform para consultar moedas e corretoras da CoinMarketCap, com Android como plataforma principal e host iOS compartilhando UI e regras de negócio.
 
-## Conteúdo
+## Status atual — 25/08/2026
 
-- [`PROMPT_DESENVOLVIMENTO.md`](PROMPT_DESENVOLVIMENTO.md): prompt completo e executável.
+- API key integrada ao onboarding, startup e ajustes, sem rota temporária de testes.
+- Android utiliza Keystore + AES-256-GCM; iOS utiliza Swift, CryptoKit e Keychain, sem CocoaPods.
+- SQLDelight é a fonte de verdade para moedas, corretoras, cotações e cache por demanda.
+- Sincronização em passos com páginas paralelas, rate limit, transações por batch, pool, WAL, checkpoint, cancelamento e retomada.
+- Histórico e mercados são carregados ao abrir uma moeda; ativos são carregados ao abrir uma corretora.
+- Polling de 60 segundos ocorre somente para a moeda expandida.
+- Compilação compartilhada Android e 20 testes Android host aprovados; revalidação iOS desta integração requer macOS/Xcode.
+
+## Arquitetura da sincronização
+
+O fluxo executa preflight de credencial/cota e, em seguida, os passos de corretoras, metadados de corretoras, moedas e metadados de moedas. Os passos são sequenciais; as páginas de cada catálogo são baixadas com paralelismo limitado e persistidas imediatamente em transações. O checkpoint só é confirmado depois do commit.
+
+O pool usa duas conexões no Android e uma no iOS. WAL melhora a convivência entre leitura e escrita, mas o SQLite continua serializando o escritor físico. Entidades-pai usam `INSERT OR IGNORE` seguido de `UPDATE`; snapshots usam `INSERT OR REPLACE`.
+
+A API key não é mantida em estado de UI nem propagada nos passos. O executor autenticado lê o armazenamento seguro apenas no limite de cada requisição.
+
+## Documentação
+
+- [`TODO.md`](TODO.md): checklist e validações pendentes.
+- [`PROXIMOS_PASSOS.md`](PROXIMOS_PASSOS.md): próximo marco recomendado.
+- [`PLANO_SINCRONIZACAO.md`](PLANO_SINCRONIZACAO.md): plano aprovado e decisões do sincronizador.
+- [`PLANO_CRIPTOGRAFIA_API_KEY.md`](PLANO_CRIPTOGRAFIA_API_KEY.md): decisões e histórico de segurança.
+- [`PLANO_ORIGINAL.md`](PLANO_ORIGINAL.md): plano-base preservado para histórico.
+- [`PROMPT_DESENVOLVIMENTO.md`](PROMPT_DESENVOLVIMENTO.md): especificação consolidada do desafio.
+
+## Referências visuais
+
 - `docs/mockups/01-onboarding-api-key.png`
 - `docs/mockups/02-mercado-moedas.png`
 - `docs/mockups/03-mercado-busca-filtros.png`
@@ -12,29 +38,9 @@ Este pacote contém a especificação final e os mockups aprovados para o desafi
 - `docs/mockups/05-mercado-corretoras.png`
 - `docs/mockups/06-sincronizacao.png`
 
-## Sequência visual
+## Limitações atuais
 
-### 1. Onboarding e API key
-
-![Onboarding](docs/mockups/01-onboarding-api-key.png)
-
-### 2. Mercado — moedas
-
-![Lista de moedas](docs/mockups/02-mercado-moedas.png)
-
-### 3. Busca e filtros
-
-![Busca e filtros](docs/mockups/03-mercado-busca-filtros.png)
-
-### 4. Moeda expandida
-
-![Moeda expandida](docs/mockups/04-mercado-moeda-expandida.png)
-
-### 5. Mercado — corretoras
-
-![Lista de corretoras](docs/mockups/05-mercado-corretoras.png)
-
-### 6. Sincronização
-
-![Sincronização](docs/mockups/06-sincronizacao.png)
-
+- Market pairs, histórico e ativos podem retornar `403` conforme o plano; a UI mantém as demais seções disponíveis.
+- O Windows não executa testes do simulador iOS; a integração atual precisa ser revalidada em macOS/Xcode.
+- Benchmarks de paralelismo, pool e batches ainda não foram executados.
+- Filtros locais avançados e estados visuais offline/desatualizado permanecem no próximo recorte.

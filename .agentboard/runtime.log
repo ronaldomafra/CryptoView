@@ -100,3 +100,37 @@ Traceback (most recent call last):
         f"Database schema {old_version} is newer than supported {SCHEMA_VERSION}."
     )
 RuntimeError: Database schema 9 is newer than supported 8.
+Traceback (most recent call last):
+  File "<frozen runpy>", line 203, in _run_module_as_main
+  File "<frozen runpy>", line 88, in _run_code
+  File "C:\Users\ronaldo_mafra\AppData\Local\Packages\PythonSoftwareFoundation.Python.3.13_qbz5n2kfra8p0\LocalCache\local-packages\Python313\site-packages\agentboard\cli.py", line 254, in <module>
+    main()
+    ~~~~^^
+  File "C:\Users\ronaldo_mafra\AppData\Local\Packages\PythonSoftwareFoundation.Python.3.13_qbz5n2kfra8p0\LocalCache\local-packages\Python313\site-packages\agentboard\cli.py", line 243, in main
+    raise SystemExit(_runtime(args.project, args.port))
+                     ~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\ronaldo_mafra\AppData\Local\Packages\PythonSoftwareFoundation.Python.3.13_qbz5n2kfra8p0\LocalCache\local-packages\Python313\site-packages\agentboard\cli.py", line 98, in _runtime
+    app = create_app(
+        project_root=identity.root,
+        api_token=api_token,
+        project_key=identity.key,
+    )
+  File "C:\Users\ronaldo_mafra\AppData\Local\Packages\PythonSoftwareFoundation.Python.3.13_qbz5n2kfra8p0\LocalCache\local-packages\Python313\site-packages\agentboard\web.py", line 166, in create_app
+    board_service = service or BoardService(
+                               ~~~~~~~~~~~~^
+        root / policy.paths.database,
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ...<8 lines>...
+        transient_max_attempts=policy.retries.transient_max_attempts,
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "<string>", line 10, in __init__
+  File "C:\Users\ronaldo_mafra\AppData\Local\Packages\PythonSoftwareFoundation.Python.3.13_qbz5n2kfra8p0\LocalCache\local-packages\Python313\site-packages\agentboard\service.py", line 127, in __post_init__
+    initialize(self.database_path)
+    ~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\ronaldo_mafra\AppData\Local\Packages\PythonSoftwareFoundation.Python.3.13_qbz5n2kfra8p0\LocalCache\local-packages\Python313\site-packages\agentboard\storage.py", line 313, in initialize
+    raise RuntimeError(
+        f"Database schema {old_version} is newer than supported {SCHEMA_VERSION}."
+    )
+RuntimeError: Database schema 9 is newer than supported 8.

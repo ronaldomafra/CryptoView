@@ -2,6 +2,7 @@ package br.com.rmf.kmp.cryptoview.domain.model.api
 
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.JsonElement
 
 @Serializable
 internal data class ApiEnvelope<T>(
@@ -56,4 +57,120 @@ internal data class MinuteUsageDto(
 internal data class CreditUsageDto(
     @SerialName("credits_used") val creditsUsed: Int? = null,
     @SerialName("credits_left") val creditsLeft: Int? = null,
+)
+
+@Serializable
+internal data class GlobalMetricsDto(
+    @SerialName("total_cryptocurrencies") val totalCryptocurrencies: Int? = null,
+)
+
+@Serializable
+internal data class CoinListingDto(
+    val id: Long,
+    val name: String? = null,
+    val symbol: String? = null,
+    val slug: String? = null,
+    @SerialName("cmc_rank") val rank: Long? = null,
+    @SerialName("num_market_pairs") val numMarketPairs: Long? = null,
+    @SerialName("circulating_supply") val circulatingSupply: Double? = null,
+    @SerialName("total_supply") val totalSupply: Double? = null,
+    @SerialName("max_supply") val maxSupply: Double? = null,
+    @SerialName("date_added") val dateAdded: String? = null,
+    @SerialName("last_updated") val lastUpdated: String? = null,
+    val quote: JsonElement? = null,
+)
+
+@Serializable
+internal data class CoinMetadataDto(
+    val id: Long? = null,
+    val name: String? = null,
+    val symbol: String? = null,
+    val slug: String? = null,
+    val logo: String? = null,
+    val description: String? = null,
+    val urls: ResourceUrlsDto? = null,
+)
+
+@Serializable
+internal data class ResourceUrlsDto(
+    val website: List<String>? = null,
+)
+
+@Serializable
+internal data class ExchangeListingDto(
+    val id: Long,
+    val name: String? = null,
+    val slug: String? = null,
+    val rank: Long? = null,
+    @SerialName("num_market_pairs") val numMarketPairs: Long? = null,
+    @SerialName("date_launched") val dateLaunched: String? = null,
+    @SerialName("last_updated") val lastUpdated: String? = null,
+    val quote: JsonElement? = null,
+)
+
+@Serializable
+internal data class ExchangeMetadataDto(
+    val id: Long? = null,
+    val name: String? = null,
+    val slug: String? = null,
+    val logo: String? = null,
+    val description: String? = null,
+    val urls: ResourceUrlsDto? = null,
+    @SerialName("date_launched") val dateLaunched: String? = null,
+    @SerialName("maker_fee") val makerFee: Double? = null,
+    @SerialName("taker_fee") val takerFee: Double? = null,
+)
+
+@Serializable
+internal data class ExchangeAssetDto(
+    @SerialName("wallet_address") val walletAddress: String? = null,
+    val balance: Double? = null,
+    val platform: JsonElement? = null,
+    val currency: ExchangeAssetCurrencyDto? = null,
+)
+
+@Serializable
+internal data class ExchangeAssetCurrencyDto(
+    val id: Long? = null,
+    val name: String? = null,
+    val symbol: String? = null,
+    @SerialName("price_usd") val priceUsd: Double? = null,
+)
+
+@Serializable
+internal data class CoinMarketPairsDto(
+    val id: Long? = null,
+    val name: String? = null,
+    val symbol: String? = null,
+    @SerialName("num_market_pairs") val numMarketPairs: Long? = null,
+    @SerialName("market_pairs") val marketPairs: List<CoinMarketPairDto>? = null,
+)
+
+@Serializable
+internal data class CoinMarketPairDto(
+    val exchange: MarketPairExchangeDto? = null,
+    @SerialName("market_pair") val marketPair: String? = null,
+    val category: String? = null,
+    val quote: JsonElement? = null,
+)
+
+@Serializable
+internal data class MarketPairExchangeDto(
+    val id: Long? = null,
+    val name: String? = null,
+    val slug: String? = null,
+)
+
+@Serializable
+internal data class CoinHistoryDto(
+    val id: Long? = null,
+    val name: String? = null,
+    val symbol: String? = null,
+    val quotes: List<CoinHistoryQuoteDto>? = null,
+)
+
+@Serializable
+internal data class CoinHistoryQuoteDto(
+    val timestamp: String? = null,
+    val quote: JsonElement? = null,
 )

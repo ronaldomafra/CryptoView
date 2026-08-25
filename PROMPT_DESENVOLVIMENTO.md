@@ -1,5 +1,18 @@
 # CryptoView — Prompt final de desenvolvimento
 
+> **Checkpoint de implementação em 25/08/2026:** o fluxo definitivo da API key,
+> SQLDelight, pool/WAL, sincronização em passos, cache por demanda e polling da
+> moeda expandida foram implementados. Consulte `PLANO_SINCRONIZACAO.md` e
+> `TODO.md` antes de iniciar o marco de robustez, benchmark e entrega.
+
+> **Checkpoint em 25/08/2026:** a UI mockada, a integração inicial
+> `/v1/key/info` e o armazenamento seguro da API key foram implementados. O
+> fluxo de criptografia foi testado e aprovado manualmente no Android e no iOS.
+> Não reimplementar Keystore, CryptoKit, Keychain, DataStore ou seus contratos.
+> O próximo recorte deve seguir `PROXIMOS_PASSOS.md`: integrar a credencial ao
+> fluxo definitivo do aplicativo e remover a tela temporária somente após os
+> novos testes passarem.
+
 > Versão final consolidada em 24/08/2026.
 >
 > Este documento deve ser utilizado como especificação executável para desenvolver o desafio Android do Mercado Bitcoin. As versões e permissões da CoinMarketCap devem ser reconfirmadas no início da implementação, pois a API e os planos comerciais podem mudar.
@@ -979,4 +992,3 @@ Ao finalizar, apresentar:
 | Modal de sincronização | `docs/mockups/06-sincronizacao.png` |
 
 Os mockups definem hierarquia, componentes, textos principais e identidade. Ajustes menores de espaçamento são permitidos para acessibilidade e diferentes dimensões, sem alterar a arquitetura de navegação aprovada.
-

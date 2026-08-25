@@ -13,3 +13,5 @@ expect fun getPlatform(): Platform
 expect fun setPlatformHttpClient(config: CryptoProcessConfig): HttpClient
 
 expect val platformModule: Module
+
+expect fun currentTimeMillis(): Long

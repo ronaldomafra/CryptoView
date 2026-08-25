@@ -36,13 +36,16 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import br.com.rmf.kmp.cryptoview.ui.model.MockExchangeBadge
+import br.com.rmf.kmp.cryptoview.domain.model.SyncProgress
+import br.com.rmf.kmp.cryptoview.domain.model.SyncStatus
 import br.com.rmf.kmp.cryptoview.ui.theme.CryptoBorder
 import br.com.rmf.kmp.cryptoview.ui.theme.CryptoNegative
 import br.com.rmf.kmp.cryptoview.ui.theme.CryptoNegativeSoft
@@ -50,6 +53,7 @@ import br.com.rmf.kmp.cryptoview.ui.theme.CryptoOrange
 import br.com.rmf.kmp.cryptoview.ui.theme.CryptoOrangeSoft
 import br.com.rmf.kmp.cryptoview.ui.theme.CryptoPositive
 import br.com.rmf.kmp.cryptoview.ui.theme.CryptoPositiveSoft
+import coil3.compose.AsyncImage
 
 @Composable
 fun CryptoViewLogo(modifier: Modifier = Modifier) {
@@ -190,37 +194,20 @@ fun RoundBrandLogo(
 }
 
 @Composable
-fun ExchangeBadges(
-    exchanges: List<MockExchangeBadge>,
-    additional: Int,
+fun RemoteBrandLogo(
+    imageUrl: String?,
+    glyph: String,
+    backgroundColor: Color,
     modifier: Modifier = Modifier,
-    showNames: Boolean = false,
 ) {
-    Row(modifier = modifier, verticalAlignment = Alignment.CenterVertically) {
-        exchanges.take(3).forEachIndexed { index, exchange ->
-            Row(
-                modifier = if (index == 0) Modifier else Modifier.padding(start = if (showNames) 12.dp else 0.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                RoundBrandLogo(
-                    glyph = exchange.shortName,
-                    backgroundColor = exchange.color,
-                    modifier = Modifier
-                        .size(if (showNames) 30.dp else 24.dp)
-                        .then(if (showNames) Modifier else Modifier.border(1.5.dp, MaterialTheme.colorScheme.surface, CircleShape)),
-                )
-                if (showNames) {
-                    Spacer(Modifier.width(5.dp))
-                    Text(exchange.name, style = MaterialTheme.typography.bodySmall, maxLines = 1)
-                }
-            }
-        }
-        if (!showNames && additional > 0) {
-            Text(
-                text = "+$additional",
-                modifier = Modifier.padding(start = 6.dp),
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                style = MaterialTheme.typography.bodyMedium,
+    Box(modifier = modifier, contentAlignment = Alignment.Center) {
+        RoundBrandLogo(glyph, backgroundColor, Modifier.fillMaxSize())
+        if (!imageUrl.isNullOrBlank()) {
+            AsyncImage(
+                model = imageUrl,
+                contentDescription = null,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.fillMaxSize().clip(CircleShape),
             )
         }
     }
@@ -305,42 +292,44 @@ fun SparklineChart(
 
 @Composable
 fun SyncProgressContent(
+    progress: SyncProgress,
     onBackground: () -> Unit,
     onCancel: () -> Unit,
+    onResume: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val fraction = progress.percentage ?: if (progress.status == SyncStatus.COMPLETED) 1f else 0f
     Column(
         modifier = modifier.padding(22.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        Text("Sincronizando mercado", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+        Text(progress.message ?: "Sincronizando mercado", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
         Spacer(Modifier.height(18.dp))
         Box(Modifier.size(112.dp), contentAlignment = Alignment.Center) {
             Canvas(Modifier.fillMaxSize()) {
                 drawArc(CryptoOrangeSoft, -90f, 360f, false, style = Stroke(10.dp.toPx(), cap = StrokeCap.Round))
-                drawArc(CryptoOrange, -90f, 223.2f, false, style = Stroke(10.dp.toPx(), cap = StrokeCap.Round))
+                drawArc(CryptoOrange, -90f, 360f * fraction, false, style = Stroke(10.dp.toPx(), cap = StrokeCap.Round))
             }
-            Text("62%", color = CryptoOrange, fontSize = 26.sp, fontWeight = FontWeight.Bold)
+            Text("${(fraction * 100).toInt()}%", color = CryptoOrange, fontSize = 26.sp, fontWeight = FontWeight.Bold)
         }
         Spacer(Modifier.height(16.dp))
-        Text("620 de 1.000 moedas", style = MaterialTheme.typography.titleMedium)
+        Text(progress.plannedItems?.let { "${progress.persistedItems} de $it itens" } ?: "${progress.persistedItems} itens persistidos", style = MaterialTheme.typography.titleMedium)
         Spacer(Modifier.height(14.dp))
         Canvas(Modifier.fillMaxWidth().height(8.dp)) {
             drawRoundRect(CryptoOrangeSoft, size = size, cornerRadius = androidx.compose.ui.geometry.CornerRadius(size.height / 2))
-            drawRoundRect(CryptoOrange, size = Size(size.width * .62f, size.height), cornerRadius = androidx.compose.ui.geometry.CornerRadius(size.height / 2))
+            drawRoundRect(CryptoOrange, size = Size(size.width * fraction, size.height), cornerRadius = androidx.compose.ui.geometry.CornerRadius(size.height / 2))
         }
         Spacer(Modifier.height(18.dp))
         Text("Salvando dados no dispositivo", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
         Text("Você pode continuar usando o app.", color = MaterialTheme.colorScheme.onSurfaceVariant)
         Spacer(Modifier.height(18.dp))
-        PrimaryActionButton("Executar em segundo plano", onBackground, Modifier.fillMaxWidth())
+        PrimaryActionButton(if (progress.status == SyncStatus.RUNNING) "Executar em segundo plano" else "Fechar", onBackground, Modifier.fillMaxWidth())
         Spacer(Modifier.height(10.dp))
-        Text(
-            text = "Cancelar",
-            modifier = Modifier.clickable(onClick = onCancel).padding(12.dp),
-            color = CryptoOrange,
-            fontWeight = FontWeight.SemiBold,
-        )
+        if (progress.status == SyncStatus.RUNNING) {
+            Text("Cancelar", Modifier.clickable(onClick = onCancel).padding(12.dp), color = CryptoOrange, fontWeight = FontWeight.SemiBold)
+        } else if (progress.status == SyncStatus.PAUSED || progress.status == SyncStatus.FAILED) {
+            Text("Retomar", Modifier.clickable(onClick = onResume).padding(12.dp), color = CryptoOrange, fontWeight = FontWeight.SemiBold)
+        }
     }
 }
 
