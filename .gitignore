@@ -30,3 +30,5 @@ captures/
 
 # Dependências JavaScript
 node_modules/
+/.agentboard/
+/tests/
