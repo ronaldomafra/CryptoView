@@ -69,7 +69,6 @@ import br.com.rmf.kmp.cryptoview.ui.components.OutlinedCard
 import br.com.rmf.kmp.cryptoview.ui.components.PrimaryActionButton
 import br.com.rmf.kmp.cryptoview.ui.components.RemoteBrandLogo
 import br.com.rmf.kmp.cryptoview.ui.components.SparklineChart
-import br.com.rmf.kmp.cryptoview.ui.components.SyncRunningAction
 import br.com.rmf.kmp.cryptoview.ui.components.VariationPill
 import br.com.rmf.kmp.cryptoview.ui.theme.CryptoBorder
 import br.com.rmf.kmp.cryptoview.ui.theme.CryptoOrange
@@ -88,7 +87,6 @@ fun MarketScreen(
     onExchangeClick: (Long) -> Unit,
     onCoinMarketsClick: (Long) -> Unit,
     onCoinInformationClick: (Long, String) -> Unit,
-    syncDialogVisible: Boolean,
     onShowSync: () -> Unit,
 ) {
     val marketViewModel = viewModel<MarketViewModel> {
@@ -121,53 +119,53 @@ fun MarketScreen(
         Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing),
         contentAlignment = Alignment.TopCenter,
     ) {
-        LazyVerticalGrid(
-            columns = GridCells.Adaptive(330.dp),
-            state = gridState,
+        Column(
             modifier = Modifier.fillMaxSize().widthIn(max = 1080.dp),
-            contentPadding = PaddingValues(
-                start = 16.dp,
-                top = 18.dp,
-                end = 16.dp,
-                bottom = 26.dp + floatingNavigationPadding,
-            ),
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            item(span = { GridItemSpan(maxLineSpan) }) {
-                MarketHeader(
-                    query = state.query,
-                    searchVisible = state.searchVisible,
-                    filtersVisible = state.filtersVisible,
-                    selectedCoins = tab == MarketTab.Coins,
-                    lastFetchedAt = state.coins.maxOfOrNull { it.quoteFetchedAt ?: 0L }?.takeIf { it > 0L },
-                    syncing = sync.status == SyncStatus.RUNNING,
-                    showSyncIndicator = sync.status == SyncStatus.RUNNING && !syncDialogVisible,
-                    sortOrder = state.sortOrder,
-                    variation = state.variationFilter,
-                    exchangeFilters = state.availableExchangeFilters,
-                    selectedExchangeId = state.selectedExchangeId,
-                    onQueryChange = marketViewModel::setQuery,
-                    onShowSearch = marketViewModel::showSearch,
-                    onHideSearch = marketViewModel::hideSearch,
-                    onToggleFilters = marketViewModel::toggleFilters,
-                    onSortOrderChange = marketViewModel::setSortOrder,
-                    onVariationChange = marketViewModel::setVariationFilter,
-                    onExchangeChange = marketViewModel::setExchangeFilter,
-                    onClearFilters = marketViewModel::clearFilterDraft,
-                    onApplyFilters = marketViewModel::applyFilters,
-                    onCoinsClick = { tabName = MarketTab.Coins.name },
-                    onExchangesClick = {
-                        if (state.filtersVisible) marketViewModel.toggleFilters()
-                        tabName = MarketTab.Exchanges.name
-                    },
-                    onSync = {
-                        if (sync.status != SyncStatus.RUNNING) marketViewModel.synchronize()
-                        onShowSync()
-                    },
-                    onShowSync = onShowSync,
-                )
-            }
+            MarketHeader(
+                query = state.query,
+                searchVisible = state.searchVisible,
+                filtersVisible = state.filtersVisible,
+                selectedCoins = tab == MarketTab.Coins,
+                syncing = sync.status == SyncStatus.RUNNING,
+                sortOrder = state.sortOrder,
+                variation = state.variationFilter,
+                exchangeFilters = state.availableExchangeFilters,
+                selectedExchangeId = state.selectedExchangeId,
+                onQueryChange = marketViewModel::setQuery,
+                onShowSearch = marketViewModel::showSearch,
+                onHideSearch = marketViewModel::hideSearch,
+                onToggleFilters = marketViewModel::toggleFilters,
+                onSortOrderChange = marketViewModel::setSortOrder,
+                onVariationChange = marketViewModel::setVariationFilter,
+                onExchangeChange = marketViewModel::setExchangeFilter,
+                onClearFilters = marketViewModel::clearFilterDraft,
+                onApplyFilters = marketViewModel::applyFilters,
+                onCoinsClick = { tabName = MarketTab.Coins.name },
+                onExchangesClick = {
+                    if (state.filtersVisible) marketViewModel.toggleFilters()
+                    tabName = MarketTab.Exchanges.name
+                },
+                onSync = {
+                    if (sync.status == SyncStatus.RUNNING) onShowSync()
+                    else marketViewModel.synchronize()
+                },
+                modifier = Modifier.padding(start = 16.dp, top = 18.dp, end = 16.dp),
+            )
+
+            LazyVerticalGrid(
+                columns = GridCells.Adaptive(330.dp),
+                state = gridState,
+                modifier = Modifier.fillMaxWidth().weight(1f),
+                contentPadding = PaddingValues(
+                    start = 16.dp,
+                    top = 8.dp,
+                    end = 16.dp,
+                    bottom = 26.dp + floatingNavigationPadding,
+                ),
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
 
             if (tab == MarketTab.Coins) {
                 val filtering = state.query.isNotBlank()
@@ -225,20 +223,20 @@ fun MarketScreen(
                 }
             }
 
-            val loadingMore = if (tab == MarketTab.Coins) state.coinsLoading else state.exchangesLoading
-            val loadedItems = if (tab == MarketTab.Coins) state.coins else state.exchanges
-            if (loadingMore && loadedItems.isNotEmpty()) {
-                item(span = { GridItemSpan(maxLineSpan) }) {
-                    Box(
-                        Modifier.fillMaxWidth().height(46.dp),
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        CircularProgressIndicator(Modifier.size(22.dp), strokeWidth = 2.dp, color = CryptoOrange)
+                val loadingMore = if (tab == MarketTab.Coins) state.coinsLoading else state.exchangesLoading
+                val loadedItems = if (tab == MarketTab.Coins) state.coins else state.exchanges
+                if (loadingMore && loadedItems.isNotEmpty()) {
+                    item(span = { GridItemSpan(maxLineSpan) }) {
+                        Box(
+                            Modifier.fillMaxWidth().height(46.dp),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            CircularProgressIndicator(Modifier.size(22.dp), strokeWidth = 2.dp, color = CryptoOrange)
+                        }
                     }
                 }
             }
         }
-
     }
 }
 
@@ -248,9 +246,7 @@ private fun MarketHeader(
     searchVisible: Boolean,
     filtersVisible: Boolean,
     selectedCoins: Boolean,
-    lastFetchedAt: Long?,
     syncing: Boolean,
-    showSyncIndicator: Boolean,
     sortOrder: CoinSortOrder,
     variation: CoinVariationFilter,
     exchangeFilters: List<ExchangeSummary>,
@@ -267,15 +263,12 @@ private fun MarketHeader(
     onCoinsClick: () -> Unit,
     onExchangesClick: () -> Unit,
     onSync: () -> Unit,
-    onShowSync: () -> Unit,
+    modifier: Modifier = Modifier,
 ) {
-    Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+    Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(14.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text("Mercado", style = MaterialTheme.typography.displaySmall)
             Spacer(Modifier.weight(1f))
-            if (showSyncIndicator) {
-                SyncRunningAction(onClick = onShowSync)
-            }
             if (!searchVisible) {
                 IconButton(onClick = onShowSearch) {
                     CryptoIcon(CryptoIcon.Search, "Buscar", Modifier.size(25.dp))
@@ -292,6 +285,17 @@ private fun MarketHeader(
                         Modifier.size(25.dp),
                         if (filtersVisible) CryptoOrange else MaterialTheme.colorScheme.onSurface,
                     )
+                }
+            }
+            IconButton(onClick = onSync) {
+                if (syncing) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(25.dp),
+                        strokeWidth = 2.5.dp,
+                        color = CryptoOrange,
+                    )
+                } else {
+                    CryptoIcon(CryptoIcon.Refresh, "Sincronizar mercado", Modifier.size(25.dp))
                 }
             }
         }
@@ -330,19 +334,13 @@ private fun MarketHeader(
                 onDismiss = onToggleFilters,
             )
         }
-        if (!filtersVisible && query.isBlank()) {
+        AnimatedVisibility(syncing) {
             Row(
                 modifier = Modifier.clickable(onClick = onSync).padding(horizontal = 2.dp, vertical = 3.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                if (syncing) {
-                    CircularProgressIndicator(Modifier.size(17.dp), strokeWidth = 2.dp, color = CryptoOrange)
-                } else {
-                    CryptoIcon(CryptoIcon.Refresh, "Sincronizar mercado", Modifier.size(18.dp), CryptoOrange)
-                }
-                Spacer(Modifier.width(8.dp))
                 Text(
-                    if (syncing) "Sincronizando dados…" else formatRelativeUpdate(lastFetchedAt, currentTimeMillis()),
+                    "Sincronizando dados…",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -765,6 +763,12 @@ private fun ExchangeCard(exchange: ExchangeSummary, onClick: () -> Unit) {
                     exchange.rank?.let { "Ranking #$it" } ?: "Ranking indisponível",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Text(
+                    "Lançamento: ${exchange.dateLaunched?.takeIf { it.isNotBlank() }?.take(10) ?: "Não informado"}",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
                 )
             }
             Column(horizontalAlignment = Alignment.End) {

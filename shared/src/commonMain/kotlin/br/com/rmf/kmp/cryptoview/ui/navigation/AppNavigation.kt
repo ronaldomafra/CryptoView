@@ -39,9 +39,9 @@ import androidx.compose.runtime.snapshots.SnapshotStateList
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.role
@@ -68,9 +68,6 @@ import br.com.rmf.kmp.cryptoview.ui.components.SyncProgressContent
 import br.com.rmf.kmp.cryptoview.ui.theme.CryptoOrange
 import br.com.rmf.kmp.cryptoview.ui.theme.CryptoOrangeSoft
 import br.com.rmf.kmp.cryptoview.ui.theme.CryptoBorder
-import kotlin.math.PI
-import kotlin.math.cos
-import kotlin.math.sin
 import org.koin.mp.KoinPlatformTools
 
 sealed interface AppRoute : NavKey
@@ -258,7 +255,6 @@ private fun AppNavigationContent(
                     onCoinInformationClick = { coinId, paprikaId ->
                         navigation.navigate(CoinInformationRoute(coinId, paprikaId))
                     },
-                    syncDialogVisible = syncDialogVisible,
                     onShowSync = onShowSync,
                 )
             }
@@ -406,18 +402,22 @@ private fun NavigationGlyph(settings: Boolean, selected: Boolean, floating: Bool
                 }
             } else {
                 val center = Offset(size.width / 2, size.height / 2)
-                drawCircle(color, size.minDimension * .31f, center, style = Stroke(2.2.dp.toPx()))
-                drawCircle(color, size.minDimension * .10f, center, style = Stroke(2.2.dp.toPx()))
                 repeat(8) { index ->
-                    val angle = index * PI / 4.0
-                    drawLine(
-                        color,
-                        Offset(center.x + cos(angle).toFloat() * size.minDimension * .36f, center.y + sin(angle).toFloat() * size.minDimension * .36f),
-                        Offset(center.x + cos(angle).toFloat() * size.minDimension * .47f, center.y + sin(angle).toFloat() * size.minDimension * .47f),
-                        2.2.dp.toPx(),
-                        StrokeCap.Round,
-                    )
+                    rotate(index * 45f, pivot = center) {
+                        drawRoundRect(
+                            color = color,
+                            topLeft = Offset(size.width * .41f, size.height * .02f),
+                            size = androidx.compose.ui.geometry.Size(size.width * .18f, size.height * .29f),
+                            cornerRadius = androidx.compose.ui.geometry.CornerRadius(size.width * .04f),
+                        )
+                    }
                 }
+                drawCircle(
+                    color = color,
+                    radius = size.minDimension * .29f,
+                    center = center,
+                    style = Stroke(size.minDimension * .12f),
+                )
             }
         }
         if (floating) {

@@ -2,7 +2,6 @@ package br.com.rmf.kmp.cryptoview.ui.screens
 
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -10,8 +9,10 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.rememberScrollState
@@ -21,7 +22,6 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -54,57 +54,31 @@ fun OnboardingScreen(
     var showKey by rememberSaveable { mutableStateOf(false) }
     val uriHandler = LocalUriHandler.current
 
-    BoxWithConstraints(
+    Column(
         modifier = Modifier
             .fillMaxSize()
             .windowInsetsPadding(WindowInsets.safeDrawing)
-            .padding(horizontal = 24.dp),
+            .imePadding()
+            .verticalScroll(rememberScrollState())
+            .padding(horizontal = 24.dp, vertical = 24.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center,
     ) {
-        if (maxHeight >= 600.dp) {
-            CryptoViewLogo(
-                modifier = Modifier
-                    .align(Alignment.TopCenter)
-                    .padding(top = 64.dp),
-            )
-            OnboardingCard(
-                apiKey = apiKey,
-                showKey = showKey,
-                onApiKeyChange = { apiKey = it },
-                onShowKeyChange = { showKey = !showKey },
-                state = state,
-                onContinue = { onContinue(apiKey) },
-                onCancel = onCancel,
-                onCreateKey = { uriHandler.openUri("https://coinmarketcap.com/api/") },
-                modifier = Modifier
-                    .align(Alignment.Center)
-                    .widthIn(max = 560.dp)
-                    .fillMaxWidth(),
-            )
-        } else {
-            Column(
-                modifier = Modifier
-                    .widthIn(max = 560.dp)
-                    .fillMaxWidth()
-                    .verticalScroll(rememberScrollState())
-                    .padding(top = 24.dp, bottom = 24.dp)
-                    .align(Alignment.TopCenter),
-                horizontalAlignment = Alignment.CenterHorizontally,
-            ) {
-                CryptoViewLogo()
-                Spacer(Modifier.height(30.dp))
-                OnboardingCard(
-                    apiKey = apiKey,
-                    showKey = showKey,
-                    onApiKeyChange = { apiKey = it },
-                    onShowKeyChange = { showKey = !showKey },
-                    state = state,
-                    onContinue = { onContinue(apiKey) },
-                    onCancel = onCancel,
-                    onCreateKey = { uriHandler.openUri("https://coinmarketcap.com/api/") },
-                    modifier = Modifier.fillMaxWidth(),
-                )
-            }
-        }
+        CryptoViewLogo()
+        Spacer(Modifier.height(30.dp))
+        OnboardingCard(
+            apiKey = apiKey,
+            showKey = showKey,
+            onApiKeyChange = { apiKey = it },
+            onShowKeyChange = { showKey = !showKey },
+            state = state,
+            onContinue = { onContinue(apiKey) },
+            onCancel = onCancel,
+            onCreateKey = { uriHandler.openUri("https://coinmarketcap.com/api/") },
+            modifier = Modifier
+                .widthIn(max = 560.dp)
+                .fillMaxWidth(),
+        )
     }
 }
 
@@ -147,7 +121,7 @@ private fun OnboardingCard(
                         CryptoIcon(
                             if (showKey) CryptoIcon.EyeOff else CryptoIcon.Eye,
                             if (showKey) "Ocultar chave" else "Mostrar chave",
-                            Modifier.height(22.dp).widthIn(min = 22.dp),
+                            Modifier.size(22.dp),
                             MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     }
@@ -159,19 +133,8 @@ private fun OnboardingCard(
                 onClick = onContinue,
                 modifier = Modifier.fillMaxWidth(),
                 enabled = apiKey.isNotBlank() && !state.submitting,
+                loading = state.submitting,
             )
-            if (state.submitting) {
-                Spacer(Modifier.height(12.dp))
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.Center,
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    CircularProgressIndicator(Modifier.height(18.dp), strokeWidth = 2.dp)
-                    Spacer(Modifier.widthIn(min = 8.dp))
-                    Text("Consultando a CoinMarketCap", style = MaterialTheme.typography.bodySmall)
-                }
-            }
             state.errorMessage?.let { message ->
                 Spacer(Modifier.height(12.dp))
                 Text(message, color = CryptoNegative, style = MaterialTheme.typography.bodySmall)
@@ -184,7 +147,7 @@ private fun OnboardingCard(
                 CryptoIcon(
                     CryptoIcon.Lock,
                     "Armazenamento seguro",
-                    Modifier.height(20.dp).widthIn(min = 20.dp),
+                    Modifier.size(20.dp),
                     MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 Text(

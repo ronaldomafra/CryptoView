@@ -118,8 +118,8 @@ fun ExchangeDetailScreen(
                         Text(asset.symbol, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                     Column(horizontalAlignment = Alignment.End) {
-                        Text(asset.balance?.toString() ?: "—", fontWeight = FontWeight.SemiBold)
-                        Text(formatUsd(asset.valueUsd), color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text(formatUsd(asset.priceUsd), fontWeight = FontWeight.SemiBold)
+                        Text("Preço USD", color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 }
             }

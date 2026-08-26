@@ -1,57 +1,138 @@
-# CryptoView — pacote de especificação e implementação
+# CryptoView
 
-Aplicativo Kotlin Multiplatform/Compose Multiplatform para consultar moedas e corretoras da CoinMarketCap e informações descritivas da CoinPaprika, com Android como plataforma principal e host iOS compartilhando UI e regras de negócio.
+Aplicativo Kotlin Multiplatform criado para o [desafio mobile do Mercado Bitcoin](https://github.com/mb-desafio/querosermb). O app consulta moedas e corretoras, mantém os dados localmente e compartilha interface, estado e regras de negócio entre Android e iOS.
 
-## Status atual — 26/08/2026
+## Principais recursos
 
-- API key integrada ao onboarding, startup e ajustes, sem rota temporária de testes.
-- Android utiliza Keystore + AES-256-GCM; iOS utiliza Swift, CryptoKit e Keychain, sem CocoaPods.
-- SQLDelight é a fonte de verdade para moedas, corretoras, cotações e cache por demanda.
-- Sincronização coordenada com páginas paralelas, rate limit, transações por batch, pool, WAL, checkpoint, cancelamento e retomada.
-- Histórico e mercados são carregados ao abrir uma moeda; o gráfico histórico consulta diretamente a API com opções `24H`, `7D`, `30D` e `1A`, mantém cache independente por período e não aguarda o rate limiter da sincronização.
-- Ao expandir uma moeda, o app resolve em paralelo e com correspondência estrita o ID público da CoinPaprika; tanto a busca do ID quanto a tela `Informações` são executadas diretamente, sem rate limiter local.
-- Polling de 60 segundos ocorre somente para a moeda expandida.
-- Build Android, migração SQLDelight e 45 testes Android host aprovados.
-- Sincronização apresentada com progresso horizontal por etapas; no startup o modal permanece fechado e abre somente por ação do usuário. A execução continua em segundo plano e pode ser acompanhada pelo indicador da top bar.
-- Inicialização e sincronização Android validadas em dispositivo real, sem crash nem bloqueio do SQLite; restrições `403` do plano são tratadas sem interromper a sincronização das moedas.
-- Aplicativo iOS validado manualmente em macOS/Xcode em 26/08/2026.
+- Onboarding com validação e armazenamento seguro da API key.
+- Listas paginadas de moedas e corretoras, busca e filtros locais.
+- Detalhe da moeda com cotação, gráfico por período, mercados e atualização a cada 60 segundos enquanto expandida.
+- Detalhe da corretora com metadados e preços dos ativos.
+- Informações complementares da moeda fornecidas pela CoinPaprika.
+- Sincronização incremental com progresso, cancelamento, checkpoint e retomada.
+- Cache local-first: a interface observa o banco e continua útil quando a rede falha.
+- Tema claro/escuro e layout adaptável para telefone e telas maiores.
 
-## Arquitetura da sincronização
+## Telas Android
 
-O coordenador executa o preflight de credencial/cota e, em seguida, corretoras, metadados de corretoras, moedas e metadados de moedas. As etapas são sequenciais; dentro delas, um pipeline genérico de `Flow` aplica `parallelIoValue` aos downloads e `parallelDbValue` às transações. Moedas e corretoras usam a mesma configuração, e o checkpoint só é confirmado depois do commit.
+<table>
+  <tr>
+    <td align="center"><strong>Splash</strong></td>
+    <td align="center"><strong>Onboarding</strong></td>
+    <td align="center"><strong>Mercado</strong></td>
+    <td align="center"><strong>Detalhe da moeda</strong></td>
+  </tr>
+  <tr>
+    <td><img src="docs/telas/android-splash.png" width="190" alt="Splash do CryptoView no Android" /></td>
+    <td><img src="docs/telas/android-onboarding.png" width="190" alt="Onboarding Android" /></td>
+    <td><img src="docs/telas/android-mercado.png" width="190" alt="Mercado de moedas no Android" /></td>
+    <td><img src="docs/telas/android-detalhe-moeda.png" width="190" alt="Detalhe expandido da moeda no Android" /></td>
+  </tr>
+  <tr>
+    <td align="center"><strong>Busca</strong></td>
+    <td align="center"><strong>Filtros</strong></td>
+    <td align="center"><strong>Sincronização</strong></td>
+    <td align="center"><strong>Ajustes</strong></td>
+  </tr>
+  <tr>
+    <td><img src="docs/telas/android-busca.png" width="190" alt="Busca de moedas no Android" /></td>
+    <td><img src="docs/telas/android-filtros.png" width="190" alt="Filtros do mercado no Android" /></td>
+    <td><img src="docs/telas/android-sincronizacao.png" width="190" alt="Progresso da sincronização no Android" /></td>
+    <td><img src="docs/telas/android-ajustes.png" width="190" alt="Ajustes e estado dos dados no Android" /></td>
+  </tr>
+</table>
 
-O processamento usa IO/banco `40/2` no Android e `20/2` no iOS. As etapas de metadata agrupam até 250 IDs por request, executam uma janela com `parallelIoValue`, aplicam backpressure e limitam os commits com `parallelDbValue`. O rate limiter permite concorrência dentro da cota informada pelo plano e aguarda a próxima janela quando o total por minuto é atingido. WAL melhora a convivência entre leitura e escrita, mas o SQLite continua serializando o escritor físico. Entidades-pai usam `INSERT OR IGNORE` seguido de `UPDATE`; snapshots usam `INSERT OR REPLACE`.
+O aplicativo também foi validado manualmente no iOS. As capturas dessa plataforma serão adicionadas posteriormente.
 
-As listas mantêm observadores paginados contínuos sobre o SQLDelight. Cada batch confirmado incrementa a versão local e atualiza silenciosamente o prefixo já carregado, permitindo mostrar moedas, cotações, corretoras e logos durante a sincronização sem esperar sua conclusão nem descartar a paginação visível.
+## Arquitetura e estado
 
-A API key não é mantida em estado de UI nem propagada nos passos. O executor autenticado lê o armazenamento seguro apenas no limite de cada requisição.
+O projeto utiliza **MVVM**, fluxo unidirecional de dados e abordagem **local-first**. Os ViewModels compartilhados expõem estados imutáveis por `StateFlow`; a UI envia eventos e observa o estado considerando o ciclo de vida. O SQLDelight é a fonte de verdade para as telas.
 
-## Documentação
+```mermaid
+flowchart LR
+    UI[Compose Multiplatform UI] -->|Eventos| VM[ViewModels compartilhados]
+    VM -->|StateFlow| UI
+    VM --> REPO[Repositórios]
+    REPO --> DB[(SQLDelight)]
+    DB -->|Flow| REPO
+    REPO --> CMC[CoinMarketCap]
+    REPO --> CP[CoinPaprika]
+    SYNC[Coordenador de sincronização] --> CMC
+    SYNC --> DB
+```
 
-- [`TODO.md`](TODO.md): checklist e validações pendentes.
-- [`PROXIMOS_PASSOS.md`](PROXIMOS_PASSOS.md): próximo marco recomendado.
-- [`PLANO_SINCRONIZACAO.md`](PLANO_SINCRONIZACAO.md): plano aprovado e decisões do sincronizador.
-- [`PLANO_INFORMACOES_COINPAPRIKA.md`](PLANO_INFORMACOES_COINPAPRIKA.md): fluxo aprovado para resolução do ID e detalhes públicos da moeda.
-- [`PLANO_CRIPTOGRAFIA_API_KEY.md`](PLANO_CRIPTOGRAFIA_API_KEY.md): decisões e histórico de segurança.
-- [`PLANO_ORIGINAL.md`](PLANO_ORIGINAL.md): plano-base preservado para histórico.
-- [`PROMPT_DESENVOLVIMENTO.md`](PROMPT_DESENVOLVIMENTO.md): especificação consolidada do desafio.
+Responsabilidades principais:
 
-## Referências visuais
+- **UI:** Compose Multiplatform, Navigation 3, componentes reutilizáveis e estados de loading/erro/cache.
+- **Estado:** ViewModels compartilhados, `StateFlow`, eventos explícitos e estado imutável.
+- **Domínio:** repositórios e modelos sem dependência das telas.
+- **Dados:** Ktor/Ktorfit, SQLDelight, cache por recurso e mapeamento de DTOs.
+- **Injeção:** Koin com módulos de rede, banco, segurança, repositórios e ViewModels.
 
-- `docs/mockups/01-onboarding-api-key.png`
-- `docs/mockups/02-mercado-moedas.png`
-- `docs/mockups/03-mercado-busca-filtros.png`
-- `docs/mockups/04-mercado-moeda-expandida.png`
-- `docs/mockups/05-mercado-corretoras.png`
-- `docs/mockups/06-sincronizacao.png`
+## Sincronização
 
-A UI compartilhada segue esse conjunto visual no onboarding, mercado, busca/filtros, moeda expandida, corretoras, sincronização e navegação. Os filtros operam sobre o SQLDelight; a opção de corretora usa somente relações de mercado já consultadas e armazenadas no dispositivo.
+A sincronização valida a credencial e a cota, restaura checkpoints e baixa páginas em paralelo. Cada lote é salvo em transação; somente depois do commit o progresso é confirmado. Backpressure, limite de requisições e retry controlam a pressão sobre rede e SQLite.
 
-## Limitações atuais
+```mermaid
+flowchart TD
+    A[Iniciar sincronização] --> B[Validar API key e cota]
+    B --> C[Restaurar checkpoint]
+    C --> D[Corretoras]
+    D --> E[Metadados de corretoras]
+    E --> F[Moedas]
+    D -. Plano sem acesso .-> F
+    F --> G[Metadados de moedas]
+    G --> H[Commit e checkpoint por lote]
+    H --> I[(SQLDelight)]
+    I --> J[UI atualizada progressivamente]
+```
 
-- Market pairs, histórico e ativos podem retornar `403` conforme o plano; a UI mantém as demais seções disponíveis.
-- A validação manual do iOS foi aprovada; a automação do build e dos testes em runner macOS ainda está pendente.
-- O novo seletor de histórico ainda requer revalidação visual e funcional no iOS.
-- A associação CoinPaprika é propositalmente estrita; moedas sem correspondência única por símbolo e identidade mantêm `Informações` desabilitado.
-- Benchmarks de paralelismo, pool e batches ainda não foram executados.
-- Estados visuais offline/desatualizado permanecem no próximo recorte.
+Histórico, mercados da moeda, ativos da corretora e informações CoinPaprika ficam fora da sincronização global e são carregados apenas quando necessários.
+
+## Segurança da API key
+
+- **Android:** chave AES-256 não exportável no Android Keystore e envelope AES-GCM persistido no DataStore.
+- **iOS:** CryptoKit e chave protegida pelo Keychain.
+- A API key não faz parte do estado da UI e é recuperada somente no limite da requisição autenticada.
+- Headers e credenciais são redigidos dos logs.
+
+## Tecnologias
+
+| Área | Tecnologia |
+|---|---|
+| Plataforma | Kotlin Multiplatform, Android e iOS |
+| Interface | Compose Multiplatform, Material 3, Navigation 3 |
+| Estado | MVVM, StateFlow, Coroutines e Flow |
+| Rede | Ktor, Ktorfit e Kotlin Serialization |
+| Persistência | SQLDelight, WAL e transações por lote |
+| Injeção | Koin |
+| Imagens | Coil |
+
+## Executando o projeto
+
+Pré-requisitos: JDK 17, Android Studio com Android SDK 36 e, para iOS, macOS com Xcode.
+
+```bash
+# Compilar o aplicativo Android
+bash gradlew :androidApp:assembleDebug
+
+# Executar os testes compartilhados no host Android
+bash gradlew :shared:testAndroidHostTest
+```
+
+Para Android, abra o projeto no Android Studio e execute `androidApp`. Para iOS, abra `iosApp/iosApp.xcodeproj` no Xcode. A API key da CoinMarketCap é informada e validada no primeiro acesso; nenhuma credencial precisa ser adicionada ao código.
+
+## Validação
+
+- 53 testes automatizados de domínio, rede, segurança, sincronização, paginação e banco aprovados no host Android.
+- Build Android e compilação compartilhada para iOS aprovados.
+- Fluxos principais validados manualmente em dispositivos Android e iOS.
+
+## Limitações conhecidas
+
+- O plano gratuito da CoinMarketCap pode responder `403` para corretoras, ativos, market pairs ou histórico. A falha é isolada e não impede a sincronização das moedas disponíveis.
+- Não existe fallback CoinPaprika para corretoras. A CoinPaprika é usada somente para informações complementares das moedas.
+- A associação entre CoinMarketCap e CoinPaprika é estrita; quando não há correspondência segura, a ação de informações permanece indisponível.
+- A galeria atual contém apenas capturas Android.
+
+Dados de mercado: [CoinMarketCap](https://coinmarketcap.com/api/). Informações complementares: [CoinPaprika](https://coinpaprika.com/api/).
