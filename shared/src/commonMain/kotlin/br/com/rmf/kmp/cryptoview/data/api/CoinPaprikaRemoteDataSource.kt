@@ -22,9 +22,8 @@ internal class CoinPaprikaRemoteDataSource(
         }
     }
 
-    fun coinInformation(coinId: String): Flow<ApiResult<CoinPaprikaCoinDto>> = limited {
+    fun coinInformation(coinId: String): Flow<ApiResult<CoinPaprikaCoinDto>> =
         requestExecutor.execute { service.getCoinById(coinId) }
-    }
 
     private fun <T> limited(request: () -> Flow<ApiResult<T>>): Flow<ApiResult<T>> = flow {
         rateLimiter.acquire(COIN_PAPRIKA_REQUESTS_PER_MINUTE)

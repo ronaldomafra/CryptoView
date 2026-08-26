@@ -8,7 +8,7 @@ O marco de API key, banco local-first e sincronização foi implementado. O app 
 
 As informações descritivas da moeda também permanecem sob demanda. O ID CoinPaprika é pré-resolvido com correspondência estrita durante a expansão do card, enquanto a tela de informações executa no máximo uma chamada de detalhe e reutiliza cache local por 24 horas.
 
-O desenho adotado é uma versão simplificada do projeto de referência: guarda de execução única, preflight de credencial/cota, passos sequenciais, páginas paralelas dentro de cada passo, pool limitado, transações por página, checkpoints e retomada. A API key não é propagada pelo pipeline; ela é obtida somente pelo executor autenticado no instante da requisição.
+O desenho adotado é uma versão simplificada do projeto de referência: guarda de execução única, preflight de credencial/cota, passos sequenciais, páginas paralelas dentro de cada passo, metadata em lotes concorrentes de até 250 IDs, pool limitado, transações por página, checkpoints e retomada. O rate limiter libera os requests concorrentes dentro da cota do plano e aguarda a próxima janela ao atingir o total por minuto. A API key não é propagada pelo pipeline; ela é obtida somente pelo executor autenticado no instante da requisição.
 
 A execução Android em dispositivo real está estável, sem crash ou bloqueio do SQLite, e continua a sincronização das moedas quando o catálogo de corretoras retorna `403` por restrição do plano. O aplicativo iOS foi validado manualmente e aprovado em macOS/Xcode em 26/08/2026.
 

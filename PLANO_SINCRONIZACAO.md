@@ -20,6 +20,7 @@ Refatoração posterior simplificou a implementação para um único coordenador
 - Banco local como fonte das listas de moedas e corretoras.
 - Observação contínua do prefixo paginado para publicar cada batch confirmado durante a sincronização.
 - Progresso calculado por itens persistidos, não apenas recebidos.
+- Modal fechado no startup e aberto somente por ação do usuário; indicador discreto permanece disponível durante o processamento.
 - Falhas de histórico, mercados e ativos isoladas da tela principal.
 - Ajustes com estado da chave, uso da API, sincronização e limpeza de cache.
 - Somente `Mercado` e `Ajustes` na navegação principal.
@@ -29,7 +30,8 @@ Refatoração posterior simplificou a implementação para um único coordenador
 - Ordem dos passos: validação da credencial/cota → corretoras → metadados de corretoras → moedas → metadados de moedas → finalização.
 - Corretoras essenciais podem ser atualizadas no startup conforme TTL; catálogo completo de moedas é inicial/manual.
 - Downloads em ondas limitadas e persistência incremental, sem manter o catálogo inteiro em memória.
-- Paralelismo genérico IO/banco de 20/2 no Android e 20/1 no iOS; SQLite continua com escritor físico único.
+- Paralelismo genérico IO/banco de 40/2 no Android e 20/2 no iOS; SQLite continua com escritor físico único.
+- Metadata usa lotes de até 250 IDs, janelas de downloads concorrentes, buffer e commits limitados pelo paralelismo de banco.
 - Entidades-pai usam `INSERT OR IGNORE` + `UPDATE` na mesma transação para evitar o delete implícito de `REPLACE` e seus efeitos em cascata.
 - Cotações, metadados, relações, ativos, histórico, estado de cache e checkpoints usam snapshots idempotentes.
 - Reserva de cota preserva etapas essenciais; `403` de recurso não invalida automaticamente a chave.

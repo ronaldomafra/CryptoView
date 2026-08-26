@@ -16,8 +16,13 @@ import io.ktor.http.HttpStatusCode
 import io.ktor.http.headersOf
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.serialization.kotlinx.json.json
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeout
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
@@ -77,7 +82,38 @@ class CoinPaprikaRemoteDataSourceTest {
         fixture.client.close()
     }
 
+    @Test
+    fun `coin detail bypasses rate limiter while search remains limited`() = runTest {
+        val requestedPaths = mutableListOf<String>()
+        val limiter = ApiRateLimiter(
+            nowMillis = { 1_000L },
+            wait = { awaitCancellation() },
+        )
+        repeat(600) { limiter.acquire(requestsPerMinute = 600) }
+        val fixture = createFixture(rateLimiter = limiter) { request ->
+            requestedPaths += request.url.encodedPath
+            respondJson(COIN_JSON)
+        }
+
+        val information = withContext(Dispatchers.Default) {
+            withTimeout(5_000) {
+                fixture.remote.coinInformation("btc-bitcoin").first()
+            }
+        }
+        val limitedSearch = withContext(Dispatchers.Default) {
+            withTimeoutOrNull(100) {
+                fixture.remote.searchCoins("BTC").first()
+            }
+        }
+
+        assertIs<ApiResult.Success<*>>(information)
+        assertNull(limitedSearch)
+        assertEquals(listOf("/v1/coins/btc-bitcoin"), requestedPaths)
+        fixture.client.close()
+    }
+
     private fun createFixture(
+        rateLimiter: ApiRateLimiter = ApiRateLimiter(),
         handler: suspend MockRequestHandleScope.(HttpRequestData) -> io.ktor.client.request.HttpResponseData,
     ): Fixture {
         val client = HttpClient(MockEngine { request -> handler(request) }) {
@@ -94,7 +130,7 @@ class CoinPaprikaRemoteDataSourceTest {
             remote = CoinPaprikaRemoteDataSource(
                 service = service,
                 requestExecutor = CoinPaprikaRequestExecutor(),
-                rateLimiter = ApiRateLimiter(),
+                rateLimiter = rateLimiter,
             ),
             client = client,
         )

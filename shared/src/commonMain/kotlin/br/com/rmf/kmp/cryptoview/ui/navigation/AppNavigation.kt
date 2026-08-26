@@ -30,12 +30,10 @@ import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteScaffo
 import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteType
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshots.SnapshotStateList
 import androidx.compose.ui.Modifier
@@ -121,14 +119,8 @@ fun AppNavigation(
         KoinPlatformTools.defaultContext().get().get<CryptoSyncManager>()
     }
     val sync by syncManager.state.collectAsStateWithLifecycle()
-    var syncDialogVisible by rememberSaveable { mutableStateOf(false) }
-    var syncWasRunning by rememberSaveable { mutableStateOf(false) }
+    var syncDialogVisible by remember { mutableStateOf(false) }
     val syncRunning = sync.status == SyncStatus.RUNNING
-
-    LaunchedEffect(syncRunning) {
-        if (syncRunning && !syncWasRunning) syncDialogVisible = true
-        syncWasRunning = syncRunning
-    }
 
     Box(Modifier.fillMaxSize()) {
         BoxWithConstraints(Modifier.fillMaxSize()) {

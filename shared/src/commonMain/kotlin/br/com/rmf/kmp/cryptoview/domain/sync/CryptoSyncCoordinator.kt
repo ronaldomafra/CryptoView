@@ -227,25 +227,15 @@ internal class DefaultCryptoSyncCoordinator(
     private suspend fun syncExchangeMetadata(session: RunSession) {
         val phase = SyncPhase.EXCHANGE_METADATA
         session.startPhase(phase, "Atualizando corretoras")
-        val minimumFetchedAt = currentTimeMillis() - METADATA_CACHE_TTL_MILLIS
-        var page = 1
-        var skippedMissingRows = 0L
-
-        while (true) {
-            val ids = local.exchangeIdsMissingMetadata(
-                minimumFetchedAt,
-                NETWORK_PAGE_SIZE.toLong(),
-                skippedMissingRows,
-            )
-            if (ids.isEmpty()) break
-
-            session.requestPages(phase, 1)
-            val items = requestWithRetry { remote.exchangeMetadata(ids) }
-            local.persistExchangeMetadata(session.runId, page, items)
-            session.commitPage(phase, items.size)
-            skippedMissingRows += (ids.size - items.size).coerceAtLeast(0)
-            page += 1
-        }
+        processMetadataPhase(
+            session = session,
+            phase = phase,
+            selectPendingIds = { minimumFetchedAt, limit, offset ->
+                local.exchangeIdsMissingMetadata(minimumFetchedAt, limit, offset)
+            },
+            download = remote::exchangeMetadata,
+            persist = { page, items -> local.persistExchangeMetadata(session.runId, page, items) },
+        )
     }
 
     private suspend fun syncCoins(session: RunSession) {
@@ -330,24 +320,57 @@ internal class DefaultCryptoSyncCoordinator(
         }
 
         session.startPhase(phase, "Atualizando moedas")
+        processMetadataPhase(
+            session = session,
+            phase = phase,
+            selectPendingIds = { minimumFetchedAt, limit, offset ->
+                local.coinIdsMissingMetadata(minimumFetchedAt, limit, offset)
+            },
+            download = remote::coinMetadata,
+            persist = { page, items -> local.persistCoinMetadata(session.runId, page, items) },
+        )
+    }
+
+    private suspend fun <T> processMetadataPhase(
+        session: RunSession,
+        phase: SyncPhase,
+        selectPendingIds: (minimumFetchedAt: Long, limit: Long, offset: Long) -> List<Long>,
+        download: (ids: List<Long>) -> Flow<ApiResult<Map<String, T>>>,
+        persist: suspend (page: Int, items: Map<String, T>) -> Unit,
+    ) {
         val minimumFetchedAt = currentTimeMillis() - METADATA_CACHE_TTL_MILLIS
-        var page = 1
+        val windowSize = METADATA_BATCH_SIZE.toLong() * config.parallelIoValue
+        var nextPage = (session.committedPages.getValue(phase).maxOrNull() ?: 0) + 1
         var skippedMissingRows = 0L
 
         while (true) {
-            val ids = local.coinIdsMissingMetadata(
+            val ids = selectPendingIds(
                 minimumFetchedAt,
-                NETWORK_PAGE_SIZE.toLong(),
+                windowSize,
                 skippedMissingRows,
             )
             if (ids.isEmpty()) break
 
-            session.requestPages(phase, 1)
-            val items = requestWithRetry { remote.coinMetadata(ids) }
-            local.persistCoinMetadata(session.runId, page, items)
-            session.commitPage(phase, items.size)
-            skippedMissingRows += (ids.size - items.size).coerceAtLeast(0)
-            page += 1
+            val batches = ids.chunked(METADATA_BATCH_SIZE).map { batchIds ->
+                MetadataBatchRequest(page = nextPage++, ids = batchIds)
+            }
+            session.requestPages(phase, batches.size)
+
+            var missingRowsInWindow = 0L
+            batches.asFlow()
+                .processMetadataBatches(
+                    parallelIo = config.parallelIoValue,
+                    parallelDb = config.parallelDbValue,
+                    bufferMultiplier = BUFFER_MULTIPLIER,
+                    download = { batchIds -> requestWithRetry { download(batchIds) } },
+                    persist = persist,
+                )
+                .collect { commit ->
+                    missingRowsInWindow +=
+                        (commit.requestedItems - commit.persistedItems).coerceAtLeast(0)
+                    session.commitPage(phase, commit.persistedItems)
+                }
+            skippedMissingRows += missingRowsInWindow
         }
     }
 
@@ -506,6 +529,7 @@ internal class DefaultCryptoSyncCoordinator(
 
     private companion object {
         const val NETWORK_PAGE_SIZE = 400
+        const val METADATA_BATCH_SIZE = 250
         const val BUFFER_MULTIPLIER = 2
         const val MAX_RETRY_ATTEMPTS = 3
         const val MAX_RETRY_SHIFT = 4

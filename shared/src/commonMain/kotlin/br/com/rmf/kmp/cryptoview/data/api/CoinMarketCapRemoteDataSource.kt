@@ -50,31 +50,32 @@ internal class CoinMarketCapRemoteDataSource(
         requestExecutor.execute { service.getCoinQuotes(it, ids.joinToString(",")) }
     }
 
-    fun coinHistory(id: Long, range: CoinHistoryRange): Flow<ApiResult<CoinHistoryDto>> = authenticated { apiKey ->
-        requestExecutor.execute {
-            service.getCoinHistory(
-                apiKey = apiKey,
-                id = id,
-                interval = range.interval,
-                count = range.count,
-            )
-        }.map { result ->
-            when (result) {
-                is ApiResult.Failure -> result
-                is ApiResult.Success -> {
-                    val history = result.data.coinHistoryDto(id)
-                    val hasPricePoints = history?.quotes.orEmpty().any { quote ->
-                        quote.timestamp != null && quote.quote.usdQuote().doubleValue("price") != null
-                    }
-                    if (!hasPricePoints) {
-                        ApiResult.Failure(CryptoError.InvalidResponse("Histórico da moeda ausente"))
-                    } else {
-                        ApiResult.Success(requireNotNull(history), result.metadata)
+    fun coinHistory(id: Long, range: CoinHistoryRange): Flow<ApiResult<CoinHistoryDto>> =
+        authenticatedWithoutRateLimit { apiKey ->
+            requestExecutor.execute {
+                service.getCoinHistory(
+                    apiKey = apiKey,
+                    id = id,
+                    interval = range.interval,
+                    count = range.count,
+                )
+            }.map { result ->
+                when (result) {
+                    is ApiResult.Failure -> result
+                    is ApiResult.Success -> {
+                        val history = result.data.coinHistoryDto(id)
+                        val hasPricePoints = history?.quotes.orEmpty().any { quote ->
+                            quote.timestamp != null && quote.quote.usdQuote().doubleValue("price") != null
+                        }
+                        if (!hasPricePoints) {
+                            ApiResult.Failure(CryptoError.InvalidResponse("Histórico da moeda ausente"))
+                        } else {
+                            ApiResult.Success(requireNotNull(history), result.metadata)
+                        }
                     }
                 }
             }
         }
-    }
 
     fun coinMarketPairs(id: Long): Flow<ApiResult<CoinMarketPairsDto>> = authenticated {
         requestExecutor.execute { service.getCoinMarketPairs(it, id) }
@@ -100,6 +101,10 @@ internal class CoinMarketCapRemoteDataSource(
             emitAll(request(apiKey))
         }
     }
+
+    private fun <T> authenticatedWithoutRateLimit(
+        request: (String) -> Flow<ApiResult<T>>,
+    ): Flow<ApiResult<T>> = authenticatedExecutor.execute(request)
 
     private companion object {
         const val FALLBACK_REQUESTS_PER_MINUTE = 45

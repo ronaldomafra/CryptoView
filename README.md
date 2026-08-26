@@ -8,11 +8,11 @@ Aplicativo Kotlin Multiplatform/Compose Multiplatform para consultar moedas e co
 - Android utiliza Keystore + AES-256-GCM; iOS utiliza Swift, CryptoKit e Keychain, sem CocoaPods.
 - SQLDelight é a fonte de verdade para moedas, corretoras, cotações e cache por demanda.
 - Sincronização coordenada com páginas paralelas, rate limit, transações por batch, pool, WAL, checkpoint, cancelamento e retomada.
-- Histórico e mercados são carregados ao abrir uma moeda; o gráfico histórico consulta diretamente a API com opções `24H`, `7D`, `30D` e `1A`, mantendo cache independente por período.
-- Ao expandir uma moeda, o app resolve em paralelo e com correspondência estrita o ID público da CoinPaprika; `Informações` só é habilitado quando o ID está disponível e abre uma tela de dados descritivos sob demanda.
+- Histórico e mercados são carregados ao abrir uma moeda; o gráfico histórico consulta diretamente a API com opções `24H`, `7D`, `30D` e `1A`, mantém cache independente por período e não aguarda o rate limiter da sincronização.
+- Ao expandir uma moeda, o app resolve em paralelo e com correspondência estrita o ID público da CoinPaprika; `Informações` só é habilitado quando o ID está disponível e abre uma tela de dados descritivos sob demanda, sem aguardar o rate limiter.
 - Polling de 60 segundos ocorre somente para a moeda expandida.
-- Build Android, migração SQLDelight e 42 testes Android host aprovados.
-- Sincronização apresentada com progresso horizontal por etapas; ao fechar o modal, a execução continua em segundo plano e pode ser reaberta pelo indicador da top bar.
+- Build Android, migração SQLDelight e 46 testes Android host aprovados.
+- Sincronização apresentada com progresso horizontal por etapas; no startup o modal permanece fechado e abre somente por ação do usuário. A execução continua em segundo plano e pode ser acompanhada pelo indicador da top bar.
 - Inicialização e sincronização Android validadas em dispositivo real, sem crash nem bloqueio do SQLite; restrições `403` do plano são tratadas sem interromper a sincronização das moedas.
 - Aplicativo iOS validado manualmente em macOS/Xcode em 26/08/2026.
 
@@ -20,7 +20,7 @@ Aplicativo Kotlin Multiplatform/Compose Multiplatform para consultar moedas e co
 
 O coordenador executa o preflight de credencial/cota e, em seguida, corretoras, metadados de corretoras, moedas e metadados de moedas. As etapas são sequenciais; dentro delas, um pipeline genérico de `Flow` aplica `parallelIoValue` aos downloads e `parallelDbValue` às transações. Moedas e corretoras usam a mesma configuração, e o checkpoint só é confirmado depois do commit.
 
-O processamento usa IO/banco `20/2` no Android e `20/1` no iOS. WAL melhora a convivência entre leitura e escrita, mas o SQLite continua serializando o escritor físico. Entidades-pai usam `INSERT OR IGNORE` seguido de `UPDATE`; snapshots usam `INSERT OR REPLACE`.
+O processamento usa IO/banco `40/2` no Android e `20/2` no iOS. As etapas de metadata agrupam até 250 IDs por request, executam uma janela com `parallelIoValue`, aplicam backpressure e limitam os commits com `parallelDbValue`. O rate limiter permite concorrência dentro da cota informada pelo plano e aguarda a próxima janela quando o total por minuto é atingido. WAL melhora a convivência entre leitura e escrita, mas o SQLite continua serializando o escritor físico. Entidades-pai usam `INSERT OR IGNORE` seguido de `UPDATE`; snapshots usam `INSERT OR REPLACE`.
 
 As listas mantêm observadores paginados contínuos sobre o SQLDelight. Cada batch confirmado incrementa a versão local e atualiza silenciosamente o prefixo já carregado, permitindo mostrar moedas, cotações, corretoras e logos durante a sincronização sem esperar sua conclusão nem descartar a paginação visível.
 
