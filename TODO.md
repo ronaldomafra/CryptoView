@@ -22,7 +22,7 @@ Checkpoint atualizado em 26/08/2026. A marcação indica código implementado; v
 - [x] Busca local sobre o banco
 - [x] Expansão exclusiva de moeda com cotação, gráfico e mercados
 - [x] Gráfico histórico sob demanda com períodos `24H`, `7D`, `30D` e `1A`
-- [x] Ações `Corretoras` e `Informações` no card expandido, com habilitação condicionada ao ID CoinPaprika
+- [x] Ações `Corretoras` e `Informações` no card expandido; `Informações` depende somente do ID CoinPaprika, inclusive durante a sincronização
 - [x] Tela essencial de informações da moeda com estados de cache, erro, retry e links externos
 - [x] Estados de carregamento, cache e restrição de plano isolados no histórico
 - [x] Modal exibe o progresso real confirmado pelo banco

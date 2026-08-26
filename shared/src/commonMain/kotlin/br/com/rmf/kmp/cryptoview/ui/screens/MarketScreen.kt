@@ -583,7 +583,7 @@ private fun CoinCard(
                     marketsMessage?.let {
                         Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
                     }
-                    val informationEnabled = !loading && paprikaId != null
+    val informationEnabled = paprikaId != null
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(12.dp),
