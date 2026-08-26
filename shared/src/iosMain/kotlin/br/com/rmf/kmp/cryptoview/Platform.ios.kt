@@ -35,7 +35,7 @@ actual val platformModule = module {
     single {
         defaultCryptoProcessConfig(
             parallelIoValue = 20,
-            parallelDbValue = 1,
+            parallelDbValue = 2,
         )
     }
     single<HttpClient> { setPlatformHttpClient() } withOptions {

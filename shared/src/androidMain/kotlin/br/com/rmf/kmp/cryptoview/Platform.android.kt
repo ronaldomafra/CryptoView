@@ -30,7 +30,7 @@ actual fun setPlatformHttpClient(): HttpClient = HttpClient(CIO) {
 actual val platformModule = module {
     single {
         defaultCryptoProcessConfig(
-            parallelIoValue = 20,
+            parallelIoValue = 40,
             parallelDbValue = 2,
         )
     }

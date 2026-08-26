@@ -18,6 +18,7 @@ Refatoração posterior simplificou a implementação para um único coordenador
 ## UI
 
 - Banco local como fonte das listas de moedas e corretoras.
+- Observação contínua do prefixo paginado para publicar cada batch confirmado durante a sincronização.
 - Progresso calculado por itens persistidos, não apenas recebidos.
 - Falhas de histórico, mercados e ativos isoladas da tela principal.
 - Ajustes com estado da chave, uso da API, sincronização e limpeza de cache.

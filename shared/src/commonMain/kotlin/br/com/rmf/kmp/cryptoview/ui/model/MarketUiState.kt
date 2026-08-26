@@ -3,6 +3,7 @@ package br.com.rmf.kmp.cryptoview.ui.model
 import br.com.rmf.kmp.cryptoview.domain.model.CoinExchangeMarket
 import br.com.rmf.kmp.cryptoview.domain.model.CoinHistoryPoint
 import br.com.rmf.kmp.cryptoview.domain.model.CoinHistoryRange
+import br.com.rmf.kmp.cryptoview.domain.model.CoinInformationFailure
 import br.com.rmf.kmp.cryptoview.domain.model.CoinSummary
 import br.com.rmf.kmp.cryptoview.domain.model.CoinSortOrder
 import br.com.rmf.kmp.cryptoview.domain.model.CoinVariationFilter
@@ -34,5 +35,8 @@ data class MarketUiState(
     val detailsLoading: Boolean = false,
     val marketsError: CryptoError? = null,
     val historyError: CryptoError? = null,
+    val resolvedPaprikaId: String? = null,
+    val paprikaIdLoading: Boolean = false,
+    val paprikaIdFailure: CoinInformationFailure? = null,
     val pollingIntervalSeconds: Long = 30,
 )

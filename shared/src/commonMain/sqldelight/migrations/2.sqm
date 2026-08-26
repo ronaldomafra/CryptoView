@@ -1,0 +1,30 @@
+CREATE TABLE coin_paprika_mapping (
+    coinId INTEGER NOT NULL PRIMARY KEY REFERENCES coin(id) ON DELETE CASCADE,
+    paprikaId TEXT NOT NULL,
+    resolvedAt INTEGER NOT NULL
+);
+
+CREATE TABLE coin_paprika_info (
+    coinId INTEGER NOT NULL PRIMARY KEY REFERENCES coin(id) ON DELETE CASCADE,
+    paprikaId TEXT NOT NULL,
+    name TEXT NOT NULL,
+    symbol TEXT NOT NULL,
+    rank INTEGER,
+    isActive INTEGER NOT NULL,
+    type TEXT,
+    logoUrl TEXT,
+    description TEXT,
+    message TEXT,
+    openSource INTEGER,
+    hardwareWallet INTEGER,
+    startedAt TEXT,
+    developmentStatus TEXT,
+    proofType TEXT,
+    orgStructure TEXT,
+    hashAlgorithm TEXT,
+    websiteUrl TEXT,
+    explorerUrl TEXT,
+    sourceCodeUrl TEXT,
+    whitepaperUrl TEXT,
+    fetchedAt INTEGER NOT NULL
+);

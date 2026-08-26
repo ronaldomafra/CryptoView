@@ -61,6 +61,7 @@ import br.com.rmf.kmp.cryptoview.domain.model.CoinMarketCapKeyInfo
 import br.com.rmf.kmp.cryptoview.domain.model.SyncStatus
 import br.com.rmf.kmp.cryptoview.domain.sync.CryptoSyncManager
 import br.com.rmf.kmp.cryptoview.ui.screens.CoinMarketsScreen
+import br.com.rmf.kmp.cryptoview.ui.screens.CoinInformationScreen
 import br.com.rmf.kmp.cryptoview.ui.screens.ExchangeDetailScreen
 import br.com.rmf.kmp.cryptoview.ui.screens.MarketScreen
 import br.com.rmf.kmp.cryptoview.ui.screens.SettingsScreen
@@ -79,6 +80,7 @@ data object MarketRoute : AppRoute
 data object SettingsRoute : AppRoute
 data class ExchangeDetailRoute(val exchangeId: Long) : AppRoute
 data class CoinMarketsRoute(val coinId: Long) : AppRoute
+data class CoinInformationRoute(val coinId: Long, val coinPaprikaId: String) : AppRoute
 
 private class AppNavigationState {
     private val marketStack = mutableStateListOf<AppRoute>(MarketRoute)
@@ -261,6 +263,9 @@ private fun AppNavigationContent(
                 MarketScreen(
                     onExchangeClick = { navigation.navigate(ExchangeDetailRoute(it)) },
                     onCoinMarketsClick = { navigation.navigate(CoinMarketsRoute(it)) },
+                    onCoinInformationClick = { coinId, paprikaId ->
+                        navigation.navigate(CoinInformationRoute(coinId, paprikaId))
+                    },
                     syncDialogVisible = syncDialogVisible,
                     onShowSync = onShowSync,
                 )
@@ -289,6 +294,15 @@ private fun AppNavigationContent(
                     coinId = route.coinId,
                     onBack = navigation::goBack,
                     onExchangeClick = { navigation.navigate(ExchangeDetailRoute(it)) },
+                    showSyncIndicator = syncRunning && !syncDialogVisible,
+                    onShowSync = onShowSync,
+                )
+            }
+            entry<CoinInformationRoute> { route ->
+                CoinInformationScreen(
+                    coinId = route.coinId,
+                    coinPaprikaId = route.coinPaprikaId,
+                    onBack = navigation::goBack,
                     showSyncIndicator = syncRunning && !syncDialogVisible,
                     onShowSync = onShowSync,
                 )

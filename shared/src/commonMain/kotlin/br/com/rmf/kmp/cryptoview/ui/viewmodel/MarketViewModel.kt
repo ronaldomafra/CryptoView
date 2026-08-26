@@ -5,23 +5,24 @@ import androidx.lifecycle.viewModelScope
 import br.com.rmf.kmp.cryptoview.domain.model.CoinSortOrder
 import br.com.rmf.kmp.cryptoview.domain.model.CoinHistoryRange
 import br.com.rmf.kmp.cryptoview.domain.model.CoinVariationFilter
-import br.com.rmf.kmp.cryptoview.domain.model.SyncPhase
-import br.com.rmf.kmp.cryptoview.domain.model.SyncStatus
+import br.com.rmf.kmp.cryptoview.domain.model.CoinInformationFailure
+import br.com.rmf.kmp.cryptoview.domain.model.CoinPaprikaIdResult
+import br.com.rmf.kmp.cryptoview.domain.model.CoinSummary
 import br.com.rmf.kmp.cryptoview.domain.model.SyncTrigger
 import br.com.rmf.kmp.cryptoview.domain.repository.MarketRepository
+import br.com.rmf.kmp.cryptoview.domain.repository.CoinInformationRepository
 import br.com.rmf.kmp.cryptoview.domain.sync.CryptoSyncManager
 import br.com.rmf.kmp.cryptoview.ui.model.MarketUiState
-import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
 class MarketViewModel internal constructor(
     private val repository: MarketRepository,
+    private val informationRepository: CoinInformationRepository,
     private val syncManager: CryptoSyncManager,
 ) : ViewModel() {
     private var activeQuery = ""
@@ -29,12 +30,6 @@ class MarketViewModel internal constructor(
     private var activeVariationFilter = CoinVariationFilter.ALL
     private var activeExchangeFilterId: Long? = null
 
-    private var nextCoinOffset = 0
-    private var nextExchangeOffset = 0
-    private var coinGeneration = 0
-    private var exchangeGeneration = 0
-    private var coinLoadJob: Job? = null
-    private var exchangeLoadJob: Job? = null
     private var queryJob: Job? = null
     private var detailJob: Job? = null
     private var historyJob: Job? = null
@@ -46,6 +41,52 @@ class MarketViewModel internal constructor(
     val uiState: StateFlow<MarketUiState> = _uiState.asStateFlow()
     val syncState = syncManager.state
 
+    private val coinObserver = ProgressivePagedObserver(
+        scope = viewModelScope,
+        pageSize = PAGE_SIZE,
+        observe = { limit ->
+            repository.observeCoins(
+                query = activeQuery,
+                limit = limit,
+                sortOrder = activeSortOrder,
+                variation = activeVariationFilter,
+                exchangeId = activeExchangeFilterId,
+            )
+        },
+        onLoading = {
+            _uiState.value = _uiState.value.copy(coinsLoading = true)
+        },
+        onItems = { coins, hasMore ->
+            _uiState.value = _uiState.value.copy(
+                coins = coins,
+                coinsLoading = false,
+                coinsHasMore = hasMore,
+            )
+        },
+        onFailure = {
+            _uiState.value = _uiState.value.copy(coinsLoading = false, coinsHasMore = false)
+        },
+    )
+
+    private val exchangeObserver = ProgressivePagedObserver(
+        scope = viewModelScope,
+        pageSize = PAGE_SIZE,
+        observe = { limit -> repository.observeExchanges(activeQuery, limit) },
+        onLoading = {
+            _uiState.value = _uiState.value.copy(exchangesLoading = true)
+        },
+        onItems = { exchanges, hasMore ->
+            _uiState.value = _uiState.value.copy(
+                exchanges = exchanges,
+                exchangesLoading = false,
+                exchangesHasMore = hasMore,
+            )
+        },
+        onFailure = {
+            _uiState.value = _uiState.value.copy(exchangesLoading = false, exchangesHasMore = false)
+        },
+    )
+
     init {
         resetCoinPagination()
         resetExchangePagination()
@@ -53,24 +94,6 @@ class MarketViewModel internal constructor(
         viewModelScope.launch {
             repository.observeCachedMarketExchanges(2).collect { exchanges ->
                 _uiState.value = _uiState.value.copy(availableExchangeFilters = exchanges)
-            }
-        }
-        viewModelScope.launch {
-            var lastStatus: SyncStatus? = null
-            var lastPhase: SyncPhase? = null
-            syncManager.state.collect { progress ->
-                if (progress.status == SyncStatus.COMPLETED && lastStatus != SyncStatus.COMPLETED) {
-                    resetCoinPagination()
-                    resetExchangePagination()
-                } else if (progress.status == SyncStatus.RUNNING && progress.phase != lastPhase) {
-                    when (progress.phase) {
-                        SyncPhase.COINS -> if (_uiState.value.coins.isEmpty()) resetCoinPagination()
-                        SyncPhase.EXCHANGES -> if (_uiState.value.exchanges.isEmpty()) resetExchangePagination()
-                        else -> Unit
-                    }
-                }
-                lastStatus = progress.status
-                lastPhase = progress.phase
             }
         }
     }
@@ -145,96 +168,43 @@ class MarketViewModel internal constructor(
     fun loadNextCoinsPage() {
         val state = _uiState.value
         if (state.coinsLoading || !state.coinsHasMore) return
-
-        val generation = coinGeneration
-        val offset = nextCoinOffset
-        _uiState.value = state.copy(coinsLoading = true)
-        coinLoadJob = viewModelScope.launch {
-            try {
-                val page = repository.observeCoins(
-                    query = activeQuery,
-                    limit = PAGE_SIZE,
-                    sortOrder = activeSortOrder,
-                    variation = activeVariationFilter,
-                    exchangeId = activeExchangeFilterId,
-                    offset = offset,
-                ).first()
-                if (generation != coinGeneration) return@launch
-
-                val current = if (offset == 0) emptyList() else _uiState.value.coins
-                nextCoinOffset = offset + page.size
-                _uiState.value = _uiState.value.copy(
-                    coins = (current + page).distinctBy { it.id },
-                    coinsLoading = false,
-                    coinsHasMore = page.size == PAGE_SIZE,
-                )
-            } catch (error: CancellationException) {
-                throw error
-            } catch (_: Throwable) {
-                if (generation == coinGeneration) {
-                    _uiState.value = _uiState.value.copy(coinsLoading = false, coinsHasMore = false)
-                }
-            }
-        }
+        coinObserver.loadNext()
     }
 
     fun loadNextExchangesPage() {
         val state = _uiState.value
         if (state.exchangesLoading || !state.exchangesHasMore) return
-
-        val generation = exchangeGeneration
-        val offset = nextExchangeOffset
-        _uiState.value = state.copy(exchangesLoading = true)
-        exchangeLoadJob = viewModelScope.launch {
-            try {
-                val page = repository.observeExchanges(activeQuery, PAGE_SIZE, offset).first()
-                if (generation != exchangeGeneration) return@launch
-
-                val current = if (offset == 0) emptyList() else _uiState.value.exchanges
-                nextExchangeOffset = offset + page.size
-                _uiState.value = _uiState.value.copy(
-                    exchanges = (current + page).distinctBy { it.id },
-                    exchangesLoading = false,
-                    exchangesHasMore = page.size == PAGE_SIZE,
-                )
-            } catch (error: CancellationException) {
-                throw error
-            } catch (_: Throwable) {
-                if (generation == exchangeGeneration) {
-                    _uiState.value = _uiState.value.copy(exchangesLoading = false, exchangesHasMore = false)
-                }
-            }
-        }
+        exchangeObserver.loadNext()
     }
 
     private fun resetCoinPagination() {
-        coinGeneration += 1
-        coinLoadJob?.cancel()
-        nextCoinOffset = 0
         _uiState.value = _uiState.value.copy(
             coins = emptyList(),
-            coinsLoading = false,
+            coinsLoading = true,
             coinsHasMore = true,
         )
-        loadNextCoinsPage()
+        coinObserver.reset()
     }
 
     private fun resetExchangePagination() {
-        exchangeGeneration += 1
-        exchangeLoadJob?.cancel()
-        nextExchangeOffset = 0
         _uiState.value = _uiState.value.copy(
             exchanges = emptyList(),
-            exchangesLoading = false,
+            exchangesLoading = true,
             exchangesHasMore = true,
         )
-        loadNextExchangesPage()
+        exchangeObserver.reset()
     }
 
     fun expandCoin(id: Long?) {
+        val selectedCoin = id?.let { coinId -> _uiState.value.coins.firstOrNull { it.id == coinId } }
         stopCoinDetails()
         if (id == null || _uiState.value.expandedCoinId == id) {
-            _uiState.value = _uiState.value.copy(expandedCoinId = null)
+            _uiState.value = _uiState.value.copy(
+                expandedCoinId = null,
+                resolvedPaprikaId = null,
+                paprikaIdLoading = false,
+                paprikaIdFailure = null,
+            )
             return
         }
         _uiState.value = _uiState.value.copy(
@@ -246,6 +216,13 @@ class MarketViewModel internal constructor(
             detailsLoading = true,
             marketsError = null,
             historyError = null,
+            resolvedPaprikaId = null,
+            paprikaIdLoading = selectedCoin != null,
+            paprikaIdFailure = if (selectedCoin == null) {
+                CoinInformationFailure.UnresolvedIdentity
+            } else {
+                null
+            },
         )
         detailJob = viewModelScope.launch {
             launch {
@@ -265,6 +242,15 @@ class MarketViewModel internal constructor(
                 }
             }
             launch {
+                informationRepository.observeMapping(id).collect { mapping ->
+                    if (_uiState.value.expandedCoinId == id) {
+                        _uiState.value = _uiState.value.copy(
+                            resolvedPaprikaId = mapping?.paprikaId,
+                        )
+                    }
+                }
+            }
+            launch {
                 val result = repository.refreshCoinDetails(id)
                 _uiState.value = _uiState.value.copy(
                     detailsLoading = false,
@@ -273,11 +259,44 @@ class MarketViewModel internal constructor(
             }
         }
         loadHistory(id, CoinHistoryRange.HOURS_24)
+        selectedCoin?.let(::resolveCoinPaprikaId)
         pollingJob = viewModelScope.launch {
             while (true) {
                 delay(POLLING_INTERVAL_MILLIS)
                 if (_uiState.value.expandedCoinId != id) break
                 repository.refreshQuote(id)
+            }
+        }
+    }
+
+    fun retryCoinPaprikaResolution() {
+        val coinId = _uiState.value.expandedCoinId ?: return
+        val coin = _uiState.value.coins.firstOrNull { it.id == coinId } ?: return
+        resolveCoinPaprikaId(coin, force = true)
+    }
+
+    private fun resolveCoinPaprikaId(coin: CoinSummary, force: Boolean = false) {
+        val coinId = coin.id
+        if (_uiState.value.expandedCoinId == coinId) {
+            _uiState.value = _uiState.value.copy(
+                paprikaIdLoading = true,
+                paprikaIdFailure = null,
+            )
+        }
+        viewModelScope.launch {
+            val result = informationRepository.resolveCoinId(coin, force)
+            if (_uiState.value.expandedCoinId != coinId) return@launch
+            _uiState.value = when (result) {
+                is CoinPaprikaIdResult.Resolved -> _uiState.value.copy(
+                    resolvedPaprikaId = result.paprikaId,
+                    paprikaIdLoading = false,
+                    paprikaIdFailure = null,
+                )
+                is CoinPaprikaIdResult.Failure -> _uiState.value.copy(
+                    resolvedPaprikaId = null,
+                    paprikaIdLoading = false,
+                    paprikaIdFailure = result.reason,
+                )
             }
         }
     }

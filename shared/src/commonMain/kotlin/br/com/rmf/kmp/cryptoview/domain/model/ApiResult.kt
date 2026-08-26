@@ -29,6 +29,7 @@ sealed interface CryptoError {
     ) : CryptoError
 
     data class ServerUnavailable(val statusCode: Int) : CryptoError
+    data class NotFound(val detail: String? = null) : CryptoError
     data class InvalidResponse(val detail: String? = null) : CryptoError
     data class Serialization(val detail: String? = null) : CryptoError
     data class Unknown(val detail: String? = null) : CryptoError

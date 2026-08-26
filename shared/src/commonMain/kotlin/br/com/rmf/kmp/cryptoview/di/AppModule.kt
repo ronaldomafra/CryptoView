@@ -5,13 +5,18 @@ import br.com.rmf.kmp.cryptoview.data.api.CoinMarketCapService
 import br.com.rmf.kmp.cryptoview.data.api.ApiRateLimiter
 import br.com.rmf.kmp.cryptoview.data.api.AuthenticatedRequestExecutor
 import br.com.rmf.kmp.cryptoview.data.api.CoinMarketCapRemoteDataSource
+import br.com.rmf.kmp.cryptoview.data.api.CoinPaprikaRemoteDataSource
+import br.com.rmf.kmp.cryptoview.data.api.CoinPaprikaRequestExecutor
+import br.com.rmf.kmp.cryptoview.data.api.CoinPaprikaService
 import br.com.rmf.kmp.cryptoview.data.api.createCoinMarketCapService
+import br.com.rmf.kmp.cryptoview.data.api.createCoinPaprikaService
 import br.com.rmf.kmp.cryptoview.data.database.CryptoDatabaseDriverFactory
 import br.com.rmf.kmp.cryptoview.data.database.CryptoDatabasePool
 import br.com.rmf.kmp.cryptoview.data.database.MarketLocalDataSource
 import br.com.rmf.kmp.cryptoview.data.database.createConfiguredDriver
 import br.com.rmf.kmp.cryptoview.database.CryptoDatabase
 import br.com.rmf.kmp.cryptoview.domain.repository.MarketRepository
+import br.com.rmf.kmp.cryptoview.domain.repository.CoinInformationRepository
 import br.com.rmf.kmp.cryptoview.domain.sync.CryptoSyncCoordinator
 import br.com.rmf.kmp.cryptoview.domain.sync.CryptoSyncManager
 import br.com.rmf.kmp.cryptoview.domain.sync.DefaultCryptoSyncCoordinator
@@ -26,17 +31,22 @@ import br.com.rmf.kmp.cryptoview.ui.viewmodel.AppViewModel
 import br.com.rmf.kmp.cryptoview.ui.viewmodel.ExchangeDetailViewModel
 import br.com.rmf.kmp.cryptoview.ui.viewmodel.MarketViewModel
 import br.com.rmf.kmp.cryptoview.ui.viewmodel.CoinMarketsViewModel
+import br.com.rmf.kmp.cryptoview.ui.viewmodel.CoinInformationViewModel
 import br.com.rmf.kmp.cryptoview.ui.viewmodel.SettingsViewModel
 import de.jensklingenberg.ktorfit.Ktorfit
 import de.jensklingenberg.ktorfit.converter.FlowConverterFactory
 import de.jensklingenberg.ktorfit.converter.ResponseConverterFactory
 import io.ktor.client.HttpClient
 import org.koin.dsl.module
+import org.koin.core.qualifier.named
 import app.cash.sqldelight.db.SqlDriver
 import org.koin.core.module.dsl.onClose
 import org.koin.core.module.dsl.withOptions
 
 internal const val COIN_MARKET_CAP_BASE_URL = "https://pro-api.coinmarketcap.com/"
+internal const val COIN_PAPRIKA_BASE_URL = "https://api.coinpaprika.com/v1/"
+private const val COIN_PAPRIKA_KTORFIT = "coinPaprikaKtorfit"
+private const val COIN_PAPRIKA_RATE_LIMITER = "coinPaprikaRateLimiter"
 
 internal val networkModule = module {
     single {
@@ -61,6 +71,28 @@ internal val networkModule = module {
             rateLimiter = get(),
         )
     }
+    single(named(COIN_PAPRIKA_KTORFIT)) {
+        Ktorfit.Builder()
+            .baseUrl(COIN_PAPRIKA_BASE_URL)
+            .httpClient(get<HttpClient>())
+            .converterFactories(
+                FlowConverterFactory(),
+                ResponseConverterFactory(),
+            )
+            .build()
+    }
+    single<CoinPaprikaService> {
+        get<Ktorfit>(named(COIN_PAPRIKA_KTORFIT)).createCoinPaprikaService()
+    }
+    single { CoinPaprikaRequestExecutor() }
+    single(named(COIN_PAPRIKA_RATE_LIMITER)) { ApiRateLimiter() }
+    single {
+        CoinPaprikaRemoteDataSource(
+            service = get(),
+            requestExecutor = get(),
+            rateLimiter = get(named(COIN_PAPRIKA_RATE_LIMITER)),
+        )
+    }
 }
 
 internal val databaseModule = module {
@@ -81,6 +113,7 @@ internal val repositoryModule = module {
         )
     }
     single { MarketRepository(local = get(), remote = get()) }
+    single { CoinInformationRepository(local = get(), remote = get()) }
 }
 
 internal val syncModule = module {
@@ -118,8 +151,9 @@ internal val securityModule = module {
 
 internal val viewModelModule = module {
     factory { AppViewModel(get(), get(), get(), get()) }
-    factory { MarketViewModel(get(), get()) }
+    factory { MarketViewModel(get(), get(), get()) }
     factory { ExchangeDetailViewModel(get()) }
     factory { CoinMarketsViewModel(get()) }
+    factory { CoinInformationViewModel(get(), get()) }
     factory { SettingsViewModel(get(), get()) }
 }

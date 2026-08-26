@@ -106,6 +106,37 @@ CREATE TABLE coin_history_point (
     PRIMARY KEY(coinId, rangeKey, timestamp)
 );
 
+CREATE TABLE coin_paprika_mapping (
+    coinId INTEGER NOT NULL PRIMARY KEY REFERENCES coin(id) ON DELETE CASCADE,
+    paprikaId TEXT NOT NULL,
+    resolvedAt INTEGER NOT NULL
+);
+
+CREATE TABLE coin_paprika_info (
+    coinId INTEGER NOT NULL PRIMARY KEY REFERENCES coin(id) ON DELETE CASCADE,
+    paprikaId TEXT NOT NULL,
+    name TEXT NOT NULL,
+    symbol TEXT NOT NULL,
+    rank INTEGER,
+    isActive INTEGER NOT NULL,
+    type TEXT,
+    logoUrl TEXT,
+    description TEXT,
+    message TEXT,
+    openSource INTEGER,
+    hardwareWallet INTEGER,
+    startedAt TEXT,
+    developmentStatus TEXT,
+    proofType TEXT,
+    orgStructure TEXT,
+    hashAlgorithm TEXT,
+    websiteUrl TEXT,
+    explorerUrl TEXT,
+    sourceCodeUrl TEXT,
+    whitepaperUrl TEXT,
+    fetchedAt INTEGER NOT NULL
+);
+
 CREATE INDEX coin_history_coin_range_index ON coin_history_point(coinId, rangeKey, timestamp);
 
 CREATE TABLE resource_cache_state (
@@ -175,6 +206,30 @@ replaceCoinMetadata:
 INSERT OR REPLACE INTO coin_metadata(
     coinId, logoUrl, description, websiteUrl, fetchedAt
 ) VALUES (?, ?, ?, ?, ?);
+
+replaceCoinPaprikaMapping:
+INSERT OR REPLACE INTO coin_paprika_mapping(coinId, paprikaId, resolvedAt)
+VALUES (?, ?, ?);
+
+selectCoinPaprikaMapping:
+SELECT * FROM coin_paprika_mapping WHERE coinId = ?;
+
+deleteCoinPaprikaMapping:
+DELETE FROM coin_paprika_mapping WHERE coinId = ?;
+
+replaceCoinPaprikaInfo:
+INSERT OR REPLACE INTO coin_paprika_info(
+    coinId, paprikaId, name, symbol, rank, isActive, type, logoUrl,
+    description, message, openSource, hardwareWallet, startedAt,
+    developmentStatus, proofType, orgStructure, hashAlgorithm,
+    websiteUrl, explorerUrl, sourceCodeUrl, whitepaperUrl, fetchedAt
+) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+
+selectCoinPaprikaInfo:
+SELECT * FROM coin_paprika_info WHERE coinId = ?;
+
+deleteCoinPaprikaInfo:
+DELETE FROM coin_paprika_info WHERE coinId = ?;
 
 selectCoins:
 SELECT
@@ -445,6 +500,10 @@ DELETE FROM sync_step_checkpoint WHERE runId = ?;
 
 clearHistory:
 DELETE FROM coin_history_point;
+clearCoinPaprikaInfo:
+DELETE FROM coin_paprika_info;
+clearCoinPaprikaMappings:
+DELETE FROM coin_paprika_mapping;
 clearMarkets:
 DELETE FROM coin_exchange_market;
 clearAssets:

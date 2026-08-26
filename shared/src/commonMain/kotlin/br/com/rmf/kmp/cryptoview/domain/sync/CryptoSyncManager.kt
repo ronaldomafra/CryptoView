@@ -64,6 +64,7 @@ internal fun errorMessage(error: CryptoError): String = when (error) {
     is CryptoError.PlanUnavailable -> "Este recurso não está disponível no plano atual."
     is CryptoError.RateLimited -> "Limite temporário da API atingido."
     is CryptoError.ServerUnavailable -> "A CoinMarketCap está temporariamente indisponível."
+    is CryptoError.NotFound -> "O recurso solicitado não foi encontrado."
     is CryptoError.InvalidResponse -> "A API retornou dados inválidos."
     is CryptoError.Serialization -> "Não foi possível interpretar os dados recebidos."
     is CryptoError.Unknown -> "Não foi possível concluir a operação."

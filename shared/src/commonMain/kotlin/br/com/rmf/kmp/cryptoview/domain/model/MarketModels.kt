@@ -70,6 +70,47 @@ data class CoinHistoryPoint(
     val priceUsd: Double,
 )
 
+data class CoinPaprikaMapping(
+    val coinId: Long,
+    val paprikaId: String,
+    val resolvedAt: Long,
+)
+
+data class CoinInformation(
+    val coinId: Long,
+    val paprikaId: String,
+    val name: String,
+    val symbol: String,
+    val rank: Long?,
+    val isActive: Boolean,
+    val type: String?,
+    val logoUrl: String?,
+    val description: String?,
+    val message: String?,
+    val openSource: Boolean?,
+    val hardwareWallet: Boolean?,
+    val startedAt: String?,
+    val developmentStatus: String?,
+    val proofType: String?,
+    val orgStructure: String?,
+    val hashAlgorithm: String?,
+    val websiteUrl: String?,
+    val explorerUrl: String?,
+    val sourceCodeUrl: String?,
+    val whitepaperUrl: String?,
+    val fetchedAt: Long,
+)
+
+sealed interface CoinInformationFailure {
+    data object UnresolvedIdentity : CoinInformationFailure
+    data class Request(val error: CryptoError) : CoinInformationFailure
+}
+
+sealed interface CoinPaprikaIdResult {
+    data class Resolved(val paprikaId: String) : CoinPaprikaIdResult
+    data class Failure(val reason: CoinInformationFailure) : CoinPaprikaIdResult
+}
+
 data class ExchangeSummary(
     val id: Long,
     val name: String,

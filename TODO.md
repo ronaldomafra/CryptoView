@@ -18,9 +18,12 @@ Checkpoint atualizado em 26/08/2026. A marcação indica código implementado; v
 
 - [x] Onboarding valida e salva a chave antes de liberar o app
 - [x] Mercado observa moedas e corretoras do SQLDelight
+- [x] Listas exibem progressivamente cada batch confirmado sem perder a paginação visível
 - [x] Busca local sobre o banco
 - [x] Expansão exclusiva de moeda com cotação, gráfico e mercados
 - [x] Gráfico histórico sob demanda com períodos `24H`, `7D`, `30D` e `1A`
+- [x] Ações `Corretoras` e `Informações` no card expandido, com habilitação condicionada ao ID CoinPaprika
+- [x] Tela essencial de informações da moeda com estados de cache, erro, retry e links externos
 - [x] Estados de carregamento, cache e restrição de plano isolados no histórico
 - [x] Modal exibe o progresso real confirmado pelo banco
 - [x] Modal de sincronização usa progresso horizontal por etapas e por itens persistidos
@@ -41,6 +44,9 @@ Checkpoint atualizado em 26/08/2026. A marcação indica código implementado; v
 - [x] iOS Swift CryptoKit + Keychain, sem CocoaPods
 - [x] API key descriptografada somente no limite da requisição autenticada
 - [x] Endpoints de chave, métricas, moedas, metadados, cotações, histórico, mercados, corretoras e ativos
+- [x] Cliente CoinPaprika público separado, sem API key, com busca antecipada e detalhe sob demanda
+- [x] Mapeamento CoinMarketCap/CoinPaprika estrito, persistido e fora da sincronização global
+- [x] Cache de informações CoinPaprika por 24 horas com invalidação do ID em `404`
 - [x] SQLDelight como fonte de verdade local
 - [x] Índices, WAL, `busy_timeout` e pool controlado por `Semaphore`/`Mutex`
 - [x] Upsert seguro de entidades-pai e `INSERT OR REPLACE` para snapshots
@@ -61,7 +67,9 @@ Checkpoint atualizado em 26/08/2026. A marcação indica código implementado; v
 - [x] Testes de armazenamento seguro e consulta de chave
 - [x] Testes de parsing das duas formas de cotação USD
 - [x] Testes de reserva de cota e percentual de progresso
-- [x] Teste Android host: 33 testes aprovados em 26/08/2026
+- [x] Teste Android host: 42 testes aprovados em 26/08/2026
+- [x] Teste do observador paginado progressivo após commits sucessivos do banco
+- [x] Testes de filtragem CoinPaprika, ausência de autenticação, rota de detalhe única e tratamento de `404`
 - [x] Verificação da migração SQLDelight aprovada
 - [x] Compilação `:shared:compileAndroidMain` aprovada
 - [x] Compilação cruzada `:shared:compileKotlinIosSimulatorArm64` aprovada no host Linux

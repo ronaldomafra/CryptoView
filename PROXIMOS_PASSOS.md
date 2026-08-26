@@ -4,7 +4,9 @@ Checkpoint de implementação em 26/08/2026.
 
 ## Estado atual
 
-O marco de API key, banco local-first e sincronização foi implementado. O app inicia pelo estado real da credencial segura, executa uma sincronização em etapas e apresenta dados do SQLDelight. Moedas, corretoras e metadados entram no banco em batches à medida que as páginas retornam. Histórico, mercados de uma moeda e ativos da corretora permanecem sob demanda.
+O marco de API key, banco local-first e sincronização foi implementado. O app inicia pelo estado real da credencial segura, executa uma sincronização em etapas e apresenta dados do SQLDelight. Moedas, corretoras e metadados entram no banco em batches à medida que as páginas retornam, e as listas observam cada commit para exibir esses dados progressivamente sem aguardar o encerramento da sincronização. Histórico, mercados de uma moeda e ativos da corretora permanecem sob demanda.
+
+As informações descritivas da moeda também permanecem sob demanda. O ID CoinPaprika é pré-resolvido com correspondência estrita durante a expansão do card, enquanto a tela de informações executa no máximo uma chamada de detalhe e reutiliza cache local por 24 horas.
 
 O desenho adotado é uma versão simplificada do projeto de referência: guarda de execução única, preflight de credencial/cota, passos sequenciais, páginas paralelas dentro de cada passo, pool limitado, transações por página, checkpoints e retomada. A API key não é propagada pelo pipeline; ela é obtida somente pelo executor autenticado no instante da requisição.
 

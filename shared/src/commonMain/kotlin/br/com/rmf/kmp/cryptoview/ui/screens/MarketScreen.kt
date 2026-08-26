@@ -55,6 +55,7 @@ import br.com.rmf.kmp.cryptoview.currentTimeMillis
 import br.com.rmf.kmp.cryptoview.domain.model.CoinExchangeMarket
 import br.com.rmf.kmp.cryptoview.domain.model.CoinHistoryPoint
 import br.com.rmf.kmp.cryptoview.domain.model.CoinHistoryRange
+import br.com.rmf.kmp.cryptoview.domain.model.CoinInformationFailure
 import br.com.rmf.kmp.cryptoview.domain.model.CoinSortOrder
 import br.com.rmf.kmp.cryptoview.domain.model.CoinSummary
 import br.com.rmf.kmp.cryptoview.domain.model.CoinVariationFilter
@@ -86,6 +87,7 @@ private enum class MarketTab { Coins, Exchanges }
 fun MarketScreen(
     onExchangeClick: (Long) -> Unit,
     onCoinMarketsClick: (Long) -> Unit,
+    onCoinInformationClick: (Long, String) -> Unit,
     syncDialogVisible: Boolean,
     onShowSync: () -> Unit,
 ) {
@@ -201,9 +203,14 @@ fun MarketScreen(
                         pollingIntervalSeconds = state.pollingIntervalSeconds,
                         historyMessage = historyErrorMessage(state.historyError),
                         marketsMessage = state.marketsError?.let { "Corretoras indisponíveis para esta chave." },
+                        paprikaId = state.resolvedPaprikaId,
+                        paprikaIdLoading = state.paprikaIdLoading,
+                        paprikaIdFailure = state.paprikaIdFailure,
                         onClick = { marketViewModel.expandCoin(coin.id) },
                         onHistoryRangeChange = marketViewModel::selectHistoryRange,
                         onViewAll = { onCoinMarketsClick(coin.id) },
+                        onInformation = { paprikaId -> onCoinInformationClick(coin.id, paprikaId) },
+                        onRetryPaprikaId = marketViewModel::retryCoinPaprikaResolution,
                     )
                 }
             } else {
@@ -470,9 +477,14 @@ private fun CoinCard(
     pollingIntervalSeconds: Long,
     historyMessage: String?,
     marketsMessage: String?,
+    paprikaId: String?,
+    paprikaIdLoading: Boolean,
+    paprikaIdFailure: CoinInformationFailure?,
     onClick: () -> Unit,
     onHistoryRangeChange: (CoinHistoryRange) -> Unit,
     onViewAll: () -> Unit,
+    onInformation: (String) -> Unit,
+    onRetryPaprikaId: () -> Unit,
 ) {
     OutlinedCard(
         modifier = Modifier.fillMaxWidth().animateContentSize(),
@@ -571,12 +583,76 @@ private fun CoinCard(
                     marketsMessage?.let {
                         Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
                     }
-                    Text(
-                        "Ver todos os mercados",
-                        modifier = Modifier.clickable(onClick = onViewAll).padding(vertical = 7.dp),
-                        color = CryptoOrange,
-                        fontWeight = FontWeight.SemiBold,
-                    )
+                    val informationEnabled = !loading && paprikaId != null
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text(
+                            "Corretoras",
+                            modifier = Modifier
+                                .weight(1f)
+                                .clickable(onClick = onViewAll)
+                                .padding(vertical = 9.dp),
+                            color = CryptoOrange,
+                            fontWeight = FontWeight.SemiBold,
+                            textAlign = TextAlign.Center,
+                        )
+                        Row(
+                            modifier = Modifier
+                                .weight(1f)
+                                .clickable(enabled = informationEnabled) {
+                                    paprikaId?.let(onInformation)
+                                }
+                                .padding(vertical = 9.dp),
+                            horizontalArrangement = Arrangement.Center,
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            if (paprikaIdLoading) {
+                                CircularProgressIndicator(
+                                    modifier = Modifier.size(14.dp),
+                                    strokeWidth = 1.8.dp,
+                                    color = CryptoOrange,
+                                )
+                                Spacer(Modifier.width(6.dp))
+                            }
+                            Text(
+                                "Informações",
+                                color = if (informationEnabled || paprikaIdLoading) {
+                                    CryptoOrange
+                                } else {
+                                    MaterialTheme.colorScheme.onSurfaceVariant
+                                },
+                                fontWeight = FontWeight.SemiBold,
+                            )
+                        }
+                    }
+                    paprikaIdFailure?.let { failure ->
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Text(
+                                text = when (failure) {
+                                    CoinInformationFailure.UnresolvedIdentity -> "Informações indisponíveis para esta moeda."
+                                    is CoinInformationFailure.Request -> "Não foi possível identificar a moeda."
+                                },
+                                modifier = Modifier.weight(1f),
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                style = MaterialTheme.typography.bodySmall,
+                            )
+                            if (failure is CoinInformationFailure.Request) {
+                                Text(
+                                    "Tentar novamente",
+                                    modifier = Modifier.clickable(onClick = onRetryPaprikaId).padding(7.dp),
+                                    color = CryptoOrange,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    fontWeight = FontWeight.SemiBold,
+                                )
+                            }
+                        }
+                    }
                 }
             }
         }

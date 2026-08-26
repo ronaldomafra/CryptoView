@@ -5,6 +5,8 @@ import br.com.rmf.kmp.cryptoview.database.CryptoDatabase
 import br.com.rmf.kmp.cryptoview.domain.model.CoinExchangeMarket
 import br.com.rmf.kmp.cryptoview.domain.model.CoinHistoryPoint
 import br.com.rmf.kmp.cryptoview.domain.model.CoinHistoryRange
+import br.com.rmf.kmp.cryptoview.domain.model.CoinInformation
+import br.com.rmf.kmp.cryptoview.domain.model.CoinPaprikaMapping
 import br.com.rmf.kmp.cryptoview.domain.model.CoinSummary
 import br.com.rmf.kmp.cryptoview.domain.model.CoinSortOrder
 import br.com.rmf.kmp.cryptoview.domain.model.CoinVariationFilter
@@ -111,6 +113,24 @@ internal class MarketLocalDataSource(
             CoinHistoryPoint(timestamp, price)
         }.executeAsList()
     }.flowOn(Dispatchers.Default)
+
+    fun observeCoinPaprikaMapping(coinId: Long): Flow<CoinPaprikaMapping?> = pool.changeVersion.map {
+        coinPaprikaMapping(coinId)
+    }.flowOn(Dispatchers.Default)
+
+    fun coinPaprikaMapping(coinId: Long): CoinPaprikaMapping? = database.marketQueries
+        .selectCoinPaprikaMapping(coinId) { id, paprikaId, resolvedAt ->
+            CoinPaprikaMapping(id, paprikaId, resolvedAt)
+        }
+        .executeAsOneOrNull()
+
+    fun observeCoinInformation(coinId: Long): Flow<CoinInformation?> = pool.changeVersion.map {
+        coinInformation(coinId)
+    }.flowOn(Dispatchers.Default)
+
+    fun coinInformation(coinId: Long): CoinInformation? = database.marketQueries
+        .selectCoinPaprikaInfo(coinId, mapper = ::mapCoinInformation)
+        .executeAsOneOrNull()
 
     fun coinDescription(id: Long): Pair<String?, String?> = database.marketQueries
         .selectCoinById(id) { _, _, _, _, _, _, _, _, _, _, _, _, _, description, website ->
@@ -370,6 +390,53 @@ internal class MarketLocalDataSource(
         pool.onBatchCommitted(connection.driver)
     }
 
+    suspend fun replaceCoinPaprikaMapping(coinId: Long, paprikaId: String) =
+        pool.withConnection { connection ->
+            connection.database.marketQueries.replaceCoinPaprikaMapping(
+                coinId = coinId,
+                paprikaId = paprikaId,
+                resolvedAt = currentTimeMillis(),
+            )
+            pool.onBatchCommitted(connection.driver)
+        }
+
+    suspend fun replaceCoinInformation(information: CoinInformation) =
+        pool.withConnection { connection ->
+            connection.database.marketQueries.replaceCoinPaprikaInfo(
+                coinId = information.coinId,
+                paprikaId = information.paprikaId,
+                name = information.name,
+                symbol = information.symbol,
+                rank = information.rank,
+                isActive = information.isActive.toLong(),
+                type = information.type,
+                logoUrl = information.logoUrl,
+                description = information.description,
+                message = information.message,
+                openSource = information.openSource?.toLong(),
+                hardwareWallet = information.hardwareWallet?.toLong(),
+                startedAt = information.startedAt,
+                developmentStatus = information.developmentStatus,
+                proofType = information.proofType,
+                orgStructure = information.orgStructure,
+                hashAlgorithm = information.hashAlgorithm,
+                websiteUrl = information.websiteUrl,
+                explorerUrl = information.explorerUrl,
+                sourceCodeUrl = information.sourceCodeUrl,
+                whitepaperUrl = information.whitepaperUrl,
+                fetchedAt = information.fetchedAt,
+            )
+            pool.onBatchCommitted(connection.driver)
+        }
+
+    suspend fun invalidateCoinPaprikaMapping(coinId: Long) = pool.withConnection { connection ->
+        connection.database.transaction {
+            connection.database.marketQueries.deleteCoinPaprikaInfo(coinId)
+            connection.database.marketQueries.deleteCoinPaprikaMapping(coinId)
+        }
+        pool.onBatchCommitted(connection.driver)
+    }
+
     suspend fun markCoinsComplete(runId: String) = pool.withConnection { connection ->
         connection.database.marketQueries.markCoinsInactiveOutsideRun(runId)
         pool.onBatchCommitted(connection.driver)
@@ -463,6 +530,8 @@ internal class MarketLocalDataSource(
     suspend fun clear() = pool.withConnection { connection ->
         connection.database.transaction {
             connection.database.marketQueries.clearHistory()
+            connection.database.marketQueries.clearCoinPaprikaInfo()
+            connection.database.marketQueries.clearCoinPaprikaMappings()
             connection.database.marketQueries.clearMarkets()
             connection.database.marketQueries.clearAssets()
             connection.database.marketQueries.clearCoinMetadata()
@@ -494,7 +563,57 @@ internal class MarketLocalDataSource(
         id, name, slug, rank, numMarketPairs, spotVolumeUsd, resolvedDateLaunched,
         logoUrl, description, websiteUrl, makerFee, takerFee,
     )
+
+    private fun mapCoinInformation(
+        coinId: Long,
+        paprikaId: String,
+        name: String,
+        symbol: String,
+        rank: Long?,
+        isActive: Long,
+        type: String?,
+        logoUrl: String?,
+        description: String?,
+        message: String?,
+        openSource: Long?,
+        hardwareWallet: Long?,
+        startedAt: String?,
+        developmentStatus: String?,
+        proofType: String?,
+        orgStructure: String?,
+        hashAlgorithm: String?,
+        websiteUrl: String?,
+        explorerUrl: String?,
+        sourceCodeUrl: String?,
+        whitepaperUrl: String?,
+        fetchedAt: Long,
+    ) = CoinInformation(
+        coinId = coinId,
+        paprikaId = paprikaId,
+        name = name,
+        symbol = symbol,
+        rank = rank,
+        isActive = isActive != 0L,
+        type = type,
+        logoUrl = logoUrl,
+        description = description,
+        message = message,
+        openSource = openSource?.let { it != 0L },
+        hardwareWallet = hardwareWallet?.let { it != 0L },
+        startedAt = startedAt,
+        developmentStatus = developmentStatus,
+        proofType = proofType,
+        orgStructure = orgStructure,
+        hashAlgorithm = hashAlgorithm,
+        websiteUrl = websiteUrl,
+        explorerUrl = explorerUrl,
+        sourceCodeUrl = sourceCodeUrl,
+        whitepaperUrl = whitepaperUrl,
+        fetchedAt = fetchedAt,
+    )
 }
+
+private fun Boolean.toLong(): Long = if (this) 1L else 0L
 
 private inline fun <reified T : Enum<T>> enumValueOfOrNull(value: String): T? =
     enumValues<T>().firstOrNull { it.name == value }
