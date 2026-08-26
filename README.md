@@ -1,6 +1,6 @@
 # CryptoView
 
-Aplicativo Kotlin Multiplatform criado para o [desafio mobile do Mercado Bitcoin](https://github.com/mb-desafio/querosermb). O app consulta moedas e corretoras, mantém os dados localmente e compartilha interface, estado e regras de negócio entre Android e iOS.
+Aplicativo Kotlin Multiplatform criado para o [desafio mobile do Mercado Bitcoin](https://github.com/mb-desafio/querosermb). O app consulta moedas e corretoras, mantém os dados localmente e compartilha interface, estado e regras de negócio entre Android e iOS. O foco técnico está na sincronização concorrente, na persistência reativa com SQLite e no tratamento seguro da API key.
 
 ## Principais recursos
 
@@ -8,7 +8,7 @@ Aplicativo Kotlin Multiplatform criado para o [desafio mobile do Mercado Bitcoin
 - Listas paginadas de moedas e corretoras, busca e filtros locais.
 - Detalhe da moeda com cotação, gráfico por período, mercados e atualização a cada 60 segundos enquanto expandida.
 - Detalhe da corretora com metadados e preços dos ativos.
-- Informações complementares da moeda fornecidas pela CoinPaprika.
+- Informações complementares da moeda pela API pública da CoinPaprika, extensão adicionada além do escopo do desafio.
 - Sincronização incremental com progresso, cancelamento, checkpoint e retomada.
 - Cache local-first: a interface observa o banco e continua útil quando a rede falha.
 - Tema claro/escuro e layout adaptável para telefone e telas maiores.
@@ -46,19 +46,22 @@ O aplicativo também foi validado manualmente no iOS. As capturas dessa platafor
 
 ## Arquitetura e estado
 
-O projeto utiliza **MVVM**, fluxo unidirecional de dados e abordagem **local-first**. Os ViewModels compartilhados expõem estados imutáveis por `StateFlow`; a UI envia eventos e observa o estado considerando o ciclo de vida. O SQLDelight é a fonte de verdade para as telas.
+O projeto utiliza **MVVM**, fluxo unidirecional de dados e abordagem **local-first**. Essa foi uma decisão arquitetural específica para o desafio, com o objetivo de demonstrar sincronização, resiliência e uso reativo do SQLite; não pressupõe que o aplicativo real do Mercado Bitcoin siga a mesma abordagem.
+
+Os ViewModels compartilhados expõem estados imutáveis por `StateFlow`; a UI envia eventos e observa o estado considerando o ciclo de vida. O SQLDelight é a fonte de verdade para as telas, portanto cada lote confirmado no banco atualiza os fluxos observados e a interface progressivamente.
 
 ```mermaid
 flowchart LR
     UI[Compose Multiplatform UI] -->|Eventos| VM[ViewModels compartilhados]
     VM -->|StateFlow| UI
     VM --> REPO[Repositórios]
-    REPO --> DB[(SQLDelight)]
-    DB -->|Flow| REPO
+    REPO --> POOL[Pool SQLDelight]
+    POOL --> DB[(SQLite com WAL)]
+    DB -->|Flow reativo| REPO
     REPO --> CMC[CoinMarketCap]
     REPO --> CP[CoinPaprika]
     SYNC[Coordenador de sincronização] --> CMC
-    SYNC --> DB
+    SYNC -->|Lotes transacionais| POOL
 ```
 
 Responsabilidades principais:
@@ -66,30 +69,52 @@ Responsabilidades principais:
 - **UI:** Compose Multiplatform, Navigation 3, componentes reutilizáveis e estados de loading/erro/cache.
 - **Estado:** ViewModels compartilhados, `StateFlow`, eventos explícitos e estado imutável.
 - **Domínio:** repositórios e modelos sem dependência das telas.
-- **Dados:** Ktor/Ktorfit, SQLDelight, cache por recurso e mapeamento de DTOs.
+- **Dados:** Ktor/Ktorfit, SQLDelight, pool de conexões, cache por recurso e mapeamento de DTOs.
 - **Injeção:** Koin com módulos de rede, banco, segurança, repositórios e ViewModels.
+
+### Escolha da interface multiplataforma
+
+Não foi criada uma segunda implementação das telas em Swift 5/SwiftUI porque o Compose Multiplatform atende integralmente ao escopo e mantém a experiência equivalente nas duas plataformas sem duplicar estado e regras de apresentação. O código Swift permanece onde agrega valor: inicialização do host iOS e integração nativa com CryptoKit e Keychain.
+
+## Concorrência e desempenho
+
+A sincronização foi estruturada como um pipeline de `Flow`, separando concorrência de rede e concorrência de banco. Isso permite aproveitar o paralelismo de I/O sem transferir a mesma pressão para o SQLite.
+
+- Downloads de páginas e metadados são executados em paralelo, com limites configurados por plataforma.
+- Um buffer aplica backpressure entre download e persistência; falhas cancelam os trabalhos relacionados de forma estruturada.
+- Escritas são agrupadas em lotes e executadas dentro de transações, reduzindo commits e invalidações desnecessárias.
+- Um pool reutilizável, limitado por semáforo e preparado para até quatro conexões, controla o acesso ao banco. A concorrência de escrita atual é conservadora para reduzir contenção entre writers.
+- SQLite opera com WAL, `synchronous=NORMAL`, `busy_timeout` e checkpoints passivos periódicos.
+- Após cada commit, versões por recurso são publicadas em `StateFlow`; somente consultas interessadas são refeitas, e as listas recebem os novos lotes sem reiniciar a paginação.
 
 ## Sincronização
 
-A sincronização valida a credencial e a cota, restaura checkpoints e baixa páginas em paralelo. Cada lote é salvo em transação; somente depois do commit o progresso é confirmado. Backpressure, limite de requisições e retry controlam a pressão sobre rede e SQLite.
+A sincronização valida a credencial e a cota, restaura checkpoints e processa as páginas em paralelo. Cada lote só avança o checkpoint e o progresso depois do commit, permitindo cancelamento e retomada sem considerar como persistidos dados que ainda estavam apenas em memória.
 
 ```mermaid
 flowchart TD
     A[Iniciar sincronização] --> B[Validar API key e cota]
     B --> C[Restaurar checkpoint]
-    C --> D[Corretoras]
-    D --> E[Metadados de corretoras]
-    E --> F[Moedas]
-    D -. Plano sem acesso .-> F
-    F --> G[Metadados de moedas]
-    G --> H[Commit e checkpoint por lote]
-    H --> I[(SQLDelight)]
-    I --> J[UI atualizada progressivamente]
+    C --> D[Flow de páginas]
+    D --> E[Downloads paralelos]
+    E --> F[Buffer e backpressure]
+    F --> G[Transações em lote]
+    G --> H[Pool SQLDelight]
+    H --> I[(SQLite WAL)]
+    I --> J[Commit e checkpoint]
+    J --> K[StateFlow por recurso]
+    K --> L[UI atualizada progressivamente]
 ```
 
 Histórico, mercados da moeda, ativos da corretora e informações CoinPaprika ficam fora da sincronização global e são carregados apenas quando necessários.
 
+## Extensão com CoinPaprika
+
+Como iniciativa além dos requisitos do desafio, integrei a API pública da CoinPaprika para enriquecer o detalhe das moedas com informações complementares. A associação com a CoinMarketCap é validada de forma estrita, o conteúdo é carregado sob demanda e fica em cache local, sem aumentar o custo da sincronização principal. Considerei essa informação útil para tornar a tela de detalhe mais completa e demonstrar a integração segura de fontes diferentes.
+
 ## Segurança da API key
+
+A segurança da credencial foi tratada como requisito central: a API key nunca é armazenada em texto puro nem mantida no estado da interface.
 
 - **Android:** chave AES-256 não exportável no Android Keystore e envelope AES-GCM persistido no DataStore.
 - **iOS:** CryptoKit e chave protegida pelo Keychain.
@@ -104,7 +129,7 @@ Histórico, mercados da moeda, ativos da corretora e informações CoinPaprika f
 | Interface | Compose Multiplatform, Material 3, Navigation 3 |
 | Estado | MVVM, StateFlow, Coroutines e Flow |
 | Rede | Ktor, Ktorfit e Kotlin Serialization |
-| Persistência | SQLDelight, WAL e transações por lote |
+| Persistência | SQLDelight, SQLite/WAL, pool limitado e transações por lote |
 | Injeção | Koin |
 | Imagens | Coil |
 
