@@ -39,6 +39,7 @@ import br.com.rmf.kmp.cryptoview.ui.components.CryptoIcon
 import br.com.rmf.kmp.cryptoview.ui.components.OutlinedCard
 import br.com.rmf.kmp.cryptoview.ui.components.RoundBrandLogo
 import br.com.rmf.kmp.cryptoview.ui.components.RemoteBrandLogo
+import br.com.rmf.kmp.cryptoview.ui.components.SyncRunningAction
 import br.com.rmf.kmp.cryptoview.ui.utils.formatCompactUsd
 import br.com.rmf.kmp.cryptoview.ui.utils.formatUsd
 import br.com.rmf.kmp.cryptoview.ui.theme.CryptoOrange
@@ -46,7 +47,12 @@ import br.com.rmf.kmp.cryptoview.ui.viewmodel.ExchangeDetailViewModel
 import org.koin.mp.KoinPlatformTools
 
 @Composable
-fun ExchangeDetailScreen(exchangeId: Long, onBack: () -> Unit) {
+fun ExchangeDetailScreen(
+    exchangeId: Long,
+    onBack: () -> Unit,
+    showSyncIndicator: Boolean,
+    onShowSync: () -> Unit,
+) {
     val detailViewModel = viewModel<ExchangeDetailViewModel> {
         KoinPlatformTools.defaultContext().get().get<ExchangeDetailViewModel>()
     }
@@ -70,6 +76,8 @@ fun ExchangeDetailScreen(exchangeId: Long, onBack: () -> Unit) {
                     CryptoIcon(CryptoIcon.ChevronRight, "Voltar", Modifier.size(23.dp).rotate(180f), CryptoOrange)
                 }
                 Text("Detalhe da corretora", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
+                Spacer(Modifier.weight(1f))
+                if (showSyncIndicator) SyncRunningAction(onClick = onShowSync)
             }
         }
         state.exchange?.let { exchange ->

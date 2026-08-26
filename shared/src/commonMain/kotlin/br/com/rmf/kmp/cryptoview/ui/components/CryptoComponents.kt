@@ -22,7 +22,9 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -378,37 +380,47 @@ fun SyncProgressContent(
 ) {
     val fraction = (progress.percentage ?: if (progress.status == SyncStatus.COMPLETED) 1f else 0f).coerceIn(0f, 1f)
     Column(
-        modifier = modifier.padding(horizontal = 28.dp, vertical = 26.dp),
+        modifier = modifier.padding(horizontal = 24.dp, vertical = 24.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         Text(
-            if (progress.status == SyncStatus.COMPLETED) "Mercado atualizado" else "Sincronizando mercado",
+            syncTitle(progress.status),
             style = MaterialTheme.typography.headlineSmall,
             fontWeight = FontWeight.Bold,
             textAlign = TextAlign.Center,
         )
+        Spacer(Modifier.height(20.dp))
+        SyncSteps(progress)
         Spacer(Modifier.height(22.dp))
-        Box(Modifier.size(132.dp), contentAlignment = Alignment.Center) {
-            Canvas(Modifier.fillMaxSize()) {
-                drawArc(CryptoOrangeSoft, -90f, 360f, false, style = Stroke(11.dp.toPx(), cap = StrokeCap.Round))
-                drawArc(CryptoOrange, -90f, 360f * fraction, false, style = Stroke(11.dp.toPx(), cap = StrokeCap.Round))
-            }
-            Text("${(fraction * 100).toInt()}%", color = CryptoOrange, fontSize = 30.sp, fontWeight = FontWeight.Bold)
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                progress.message ?: phaseLabel(progress.phase),
+                modifier = Modifier.weight(1f),
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.SemiBold,
+            )
+            Spacer(Modifier.width(12.dp))
+            Text(
+                "${(fraction * 100).toInt()}%",
+                color = CryptoOrange,
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.Bold,
+            )
         }
-        Spacer(Modifier.height(18.dp))
-        Text(
-            progress.plannedItems?.let { "${progress.persistedItems} de $it ${phaseItemName(progress.phase)}" }
-                ?: "${progress.persistedItems} ${phaseItemName(progress.phase)} salvos",
-            style = MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.SemiBold,
-        )
-        Spacer(Modifier.height(16.dp))
+        Spacer(Modifier.height(10.dp))
         Canvas(Modifier.fillMaxWidth().height(8.dp)) {
             drawRoundRect(CryptoOrangeSoft, size = size, cornerRadius = androidx.compose.ui.geometry.CornerRadius(size.height / 2))
             drawRoundRect(CryptoOrange, size = Size(size.width * fraction, size.height), cornerRadius = androidx.compose.ui.geometry.CornerRadius(size.height / 2))
         }
-        Spacer(Modifier.height(22.dp))
-        Text("Salvando dados no dispositivo", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+        Spacer(Modifier.height(12.dp))
+        Text(
+            progress.plannedItems?.let { "${progress.persistedItems} de $it ${phaseItemName(progress.phase)}" }
+                ?: "${progress.persistedItems} ${phaseItemName(progress.phase)} salvos",
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            style = MaterialTheme.typography.bodyMedium,
+        )
+        Spacer(Modifier.height(18.dp))
+        Text("Salvando dados no dispositivo", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
         Text("Você pode continuar usando o app.", color = MaterialTheme.colorScheme.onSurfaceVariant, textAlign = TextAlign.Center)
         Spacer(Modifier.height(22.dp))
         PrimaryActionButton(
@@ -423,6 +435,99 @@ fun SyncProgressContent(
             Text("Retomar", Modifier.clickable(onClick = onResume).padding(12.dp), color = CryptoOrange, fontWeight = FontWeight.SemiBold)
         }
     }
+}
+
+@Composable
+fun SyncRunningAction(
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    IconButton(onClick = onClick, modifier = modifier) {
+        CircularProgressIndicator(
+            modifier = Modifier.size(22.dp).semantics {
+                contentDescription = "Sincronização em andamento. Toque para acompanhar."
+            },
+            color = CryptoOrange,
+            strokeWidth = 2.5.dp,
+        )
+    }
+}
+
+@Composable
+private fun SyncSteps(progress: SyncProgress) {
+    val labels = listOf("Acesso", "Preparar", "Corretoras", "Moedas", "Concluir")
+    val activeStep = syncStepIndex(progress.phase)
+    val finished = progress.status == SyncStatus.COMPLETED || progress.status == SyncStatus.PARTIAL
+    val lineFraction = if (finished) 1f else activeStep.toFloat() / (labels.lastIndex.coerceAtLeast(1))
+    val surfaceColor = MaterialTheme.colorScheme.surface
+
+    Column(Modifier.fillMaxWidth()) {
+        Box(Modifier.fillMaxWidth().height(20.dp), contentAlignment = Alignment.Center) {
+            Canvas(Modifier.fillMaxWidth().height(4.dp)) {
+                val stepWidth = size.width / labels.size
+                val startX = stepWidth / 2f
+                val endX = size.width - startX
+                val progressEnd = startX + (endX - startX) * lineFraction
+                drawLine(CryptoBorder, Offset(startX, size.height / 2f), Offset(endX, size.height / 2f), size.height, StrokeCap.Round)
+                drawLine(CryptoOrange, Offset(startX, size.height / 2f), Offset(progressEnd, size.height / 2f), size.height, StrokeCap.Round)
+            }
+            Row(Modifier.fillMaxWidth()) {
+                labels.indices.forEach { index ->
+                    Box(Modifier.weight(1f), contentAlignment = Alignment.Center) {
+                        Canvas(Modifier.size(16.dp)) {
+                            val reached = finished || index <= activeStep
+                            drawCircle(if (reached) CryptoOrange else CryptoOrangeSoft)
+                            if (index == activeStep && !finished) {
+                                drawCircle(surfaceColor, radius = size.minDimension * .20f)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        Spacer(Modifier.height(7.dp))
+        Row(Modifier.fillMaxWidth()) {
+            labels.forEachIndexed { index, label ->
+                Text(
+                    text = label,
+                    modifier = Modifier.weight(1f),
+                    color = if (finished || index <= activeStep) CryptoOrange else MaterialTheme.colorScheme.onSurfaceVariant,
+                    style = MaterialTheme.typography.labelSmall,
+                    fontWeight = if (index == activeStep) FontWeight.SemiBold else FontWeight.Normal,
+                    textAlign = TextAlign.Center,
+                    maxLines = 1,
+                )
+            }
+        }
+    }
+}
+
+private fun syncStepIndex(phase: SyncPhase): Int = when (phase) {
+    SyncPhase.VALIDATING_CREDENTIAL -> 0
+    SyncPhase.PREPARING, SyncPhase.RESTORING_CHECKPOINT -> 1
+    SyncPhase.EXCHANGES, SyncPhase.EXCHANGE_METADATA -> 2
+    SyncPhase.COINS, SyncPhase.COIN_METADATA -> 3
+    SyncPhase.FINALIZING, SyncPhase.COMPLETED -> 4
+}
+
+private fun phaseLabel(phase: SyncPhase): String = when (phase) {
+    SyncPhase.VALIDATING_CREDENTIAL -> "Validando acesso"
+    SyncPhase.PREPARING -> "Preparando sincronização"
+    SyncPhase.RESTORING_CHECKPOINT -> "Restaurando progresso"
+    SyncPhase.EXCHANGES -> "Baixando corretoras"
+    SyncPhase.EXCHANGE_METADATA -> "Atualizando corretoras"
+    SyncPhase.COINS -> "Baixando moedas"
+    SyncPhase.COIN_METADATA -> "Atualizando moedas"
+    SyncPhase.FINALIZING -> "Finalizando"
+    SyncPhase.COMPLETED -> "Concluído"
+}
+
+private fun syncTitle(status: SyncStatus): String = when (status) {
+    SyncStatus.COMPLETED -> "Mercado atualizado"
+    SyncStatus.PARTIAL -> "Mercado atualizado parcialmente"
+    SyncStatus.PAUSED -> "Sincronização pausada"
+    SyncStatus.FAILED -> "Não foi possível sincronizar"
+    else -> "Sincronizando mercado"
 }
 
 private fun phaseItemName(phase: SyncPhase): String = when (phase) {

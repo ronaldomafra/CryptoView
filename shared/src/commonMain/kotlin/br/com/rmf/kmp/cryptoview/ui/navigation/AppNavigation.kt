@@ -20,6 +20,8 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.NavigationRailItemDefaults
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -28,10 +30,12 @@ import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteScaffo
 import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteType
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshots.SnapshotStateList
 import androidx.compose.ui.Modifier
@@ -47,21 +51,28 @@ import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation3.runtime.NavKey
 import androidx.navigation3.runtime.entryProvider
 import androidx.navigation3.ui.NavDisplay
 import br.com.rmf.kmp.cryptoview.domain.model.CoinMarketCapKeyInfo
+import br.com.rmf.kmp.cryptoview.domain.model.SyncStatus
+import br.com.rmf.kmp.cryptoview.domain.sync.CryptoSyncManager
 import br.com.rmf.kmp.cryptoview.ui.screens.CoinMarketsScreen
 import br.com.rmf.kmp.cryptoview.ui.screens.ExchangeDetailScreen
 import br.com.rmf.kmp.cryptoview.ui.screens.MarketScreen
 import br.com.rmf.kmp.cryptoview.ui.screens.SettingsScreen
 import br.com.rmf.kmp.cryptoview.ui.components.LocalFloatingNavigationContentPadding
+import br.com.rmf.kmp.cryptoview.ui.components.SyncProgressContent
 import br.com.rmf.kmp.cryptoview.ui.theme.CryptoOrange
 import br.com.rmf.kmp.cryptoview.ui.theme.CryptoOrangeSoft
 import br.com.rmf.kmp.cryptoview.ui.theme.CryptoBorder
 import kotlin.math.PI
 import kotlin.math.cos
 import kotlin.math.sin
+import org.koin.mp.KoinPlatformTools
 
 sealed interface AppRoute : NavKey
 data object MarketRoute : AppRoute
@@ -104,82 +115,126 @@ fun AppNavigation(
     onRemoveKey: () -> Unit,
 ) {
     val navigation = remember { AppNavigationState() }
-    BoxWithConstraints(Modifier.fillMaxSize()) {
-        val compact = maxWidth < 600.dp
-        if (compact) {
-            Box(Modifier.fillMaxSize()) {
-                CompositionLocalProvider(LocalFloatingNavigationContentPadding provides 82.dp) {
-                    AppNavigationContent(
-                        navigation = navigation,
-                        keyInfo = keyInfo,
-                        validationMessage = validationMessage,
-                        onRevalidateKey = onRevalidateKey,
-                        onReplaceKey = onReplaceKey,
-                        onRemoveKey = onRemoveKey,
-                        modifier = Modifier.fillMaxSize(),
+    val syncManager = remember {
+        KoinPlatformTools.defaultContext().get().get<CryptoSyncManager>()
+    }
+    val sync by syncManager.state.collectAsStateWithLifecycle()
+    var syncDialogVisible by rememberSaveable { mutableStateOf(false) }
+    var syncWasRunning by rememberSaveable { mutableStateOf(false) }
+    val syncRunning = sync.status == SyncStatus.RUNNING
+
+    LaunchedEffect(syncRunning) {
+        if (syncRunning && !syncWasRunning) syncDialogVisible = true
+        syncWasRunning = syncRunning
+    }
+
+    Box(Modifier.fillMaxSize()) {
+        BoxWithConstraints(Modifier.fillMaxSize()) {
+            val compact = maxWidth < 600.dp
+            if (compact) {
+                Box(Modifier.fillMaxSize()) {
+                    CompositionLocalProvider(LocalFloatingNavigationContentPadding provides 82.dp) {
+                        AppNavigationContent(
+                            navigation = navigation,
+                            keyInfo = keyInfo,
+                            validationMessage = validationMessage,
+                            onRevalidateKey = onRevalidateKey,
+                            onReplaceKey = onReplaceKey,
+                            onRemoveKey = onRemoveKey,
+                            syncRunning = syncRunning,
+                            syncDialogVisible = syncDialogVisible,
+                            onShowSync = { syncDialogVisible = true },
+                            modifier = Modifier.fillMaxSize(),
+                        )
+                    }
+                    FloatingBottomNavigation(
+                        selectedRoute = navigation.selectedTopLevel,
+                        onMarketClick = { navigation.selectTopLevel(MarketRoute) },
+                        onSettingsClick = { navigation.selectTopLevel(SettingsRoute) },
+                        modifier = Modifier.align(Alignment.BottomCenter),
                     )
                 }
-                FloatingBottomNavigation(
-                    selectedRoute = navigation.selectedTopLevel,
-                    onMarketClick = { navigation.selectTopLevel(MarketRoute) },
-                    onSettingsClick = { navigation.selectTopLevel(SettingsRoute) },
-                    modifier = Modifier.align(Alignment.BottomCenter),
+                return@BoxWithConstraints
+            }
+
+            val navigationItemColors = NavigationSuiteDefaults.itemColors(
+                navigationBarItemColors = NavigationBarItemDefaults.colors(
+                    selectedIconColor = CryptoOrange,
+                    selectedTextColor = CryptoOrange,
+                    indicatorColor = Color.Transparent,
+                    unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                    unselectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                ),
+                navigationRailItemColors = NavigationRailItemDefaults.colors(
+                    selectedIconColor = CryptoOrange,
+                    selectedTextColor = CryptoOrange,
+                    indicatorColor = Color.Transparent,
+                    unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                    unselectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                ),
+            )
+
+            NavigationSuiteScaffold(
+                navigationSuiteItems = {
+                    item(
+                        selected = navigation.selectedTopLevel == MarketRoute,
+                        onClick = { navigation.selectTopLevel(MarketRoute) },
+                        icon = { NavigationGlyph(false, navigation.selectedTopLevel == MarketRoute) },
+                        label = { Text("Mercado", style = MaterialTheme.typography.labelLarge) },
+                        colors = navigationItemColors,
+                    )
+                    item(
+                        selected = navigation.selectedTopLevel == SettingsRoute,
+                        onClick = { navigation.selectTopLevel(SettingsRoute) },
+                        icon = { NavigationGlyph(true, navigation.selectedTopLevel == SettingsRoute) },
+                        label = { Text("Ajustes", style = MaterialTheme.typography.labelLarge) },
+                        colors = navigationItemColors,
+                    )
+                },
+                layoutType = NavigationSuiteType.NavigationRail,
+                navigationSuiteColors = NavigationSuiteDefaults.colors(
+                    navigationBarContainerColor = MaterialTheme.colorScheme.surface,
+                    navigationBarContentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                    navigationRailContainerColor = MaterialTheme.colorScheme.surface,
+                    navigationRailContentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                ),
+                containerColor = MaterialTheme.colorScheme.background,
+            ) {
+                AppNavigationContent(
+                    navigation = navigation,
+                    keyInfo = keyInfo,
+                    validationMessage = validationMessage,
+                    onRevalidateKey = onRevalidateKey,
+                    onReplaceKey = onReplaceKey,
+                    onRemoveKey = onRemoveKey,
+                    syncRunning = syncRunning,
+                    syncDialogVisible = syncDialogVisible,
+                    onShowSync = { syncDialogVisible = true },
                 )
             }
-            return@BoxWithConstraints
         }
 
-        val navigationItemColors = NavigationSuiteDefaults.itemColors(
-            navigationBarItemColors = NavigationBarItemDefaults.colors(
-                selectedIconColor = CryptoOrange,
-                selectedTextColor = CryptoOrange,
-                indicatorColor = Color.Transparent,
-                unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                unselectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant,
-            ),
-            navigationRailItemColors = NavigationRailItemDefaults.colors(
-                selectedIconColor = CryptoOrange,
-                selectedTextColor = CryptoOrange,
-                indicatorColor = Color.Transparent,
-                unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                unselectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant,
-            ),
-        )
-
-        NavigationSuiteScaffold(
-            navigationSuiteItems = {
-                item(
-                    selected = navigation.selectedTopLevel == MarketRoute,
-                    onClick = { navigation.selectTopLevel(MarketRoute) },
-                    icon = { NavigationGlyph(false, navigation.selectedTopLevel == MarketRoute) },
-                    label = { Text("Mercado", style = MaterialTheme.typography.labelLarge) },
-                    colors = navigationItemColors,
-                )
-                item(
-                    selected = navigation.selectedTopLevel == SettingsRoute,
-                    onClick = { navigation.selectTopLevel(SettingsRoute) },
-                    icon = { NavigationGlyph(true, navigation.selectedTopLevel == SettingsRoute) },
-                    label = { Text("Ajustes", style = MaterialTheme.typography.labelLarge) },
-                    colors = navigationItemColors,
-                )
-            },
-            layoutType = NavigationSuiteType.NavigationRail,
-            navigationSuiteColors = NavigationSuiteDefaults.colors(
-                navigationBarContainerColor = MaterialTheme.colorScheme.surface,
-                navigationBarContentColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                navigationRailContainerColor = MaterialTheme.colorScheme.surface,
-                navigationRailContentColor = MaterialTheme.colorScheme.onSurfaceVariant,
-            ),
-            containerColor = MaterialTheme.colorScheme.background,
-        ) {
-            AppNavigationContent(
-                navigation = navigation,
-                keyInfo = keyInfo,
-                validationMessage = validationMessage,
-                onRevalidateKey = onRevalidateKey,
-                onReplaceKey = onReplaceKey,
-                onRemoveKey = onRemoveKey,
-            )
+        if (syncDialogVisible) {
+            Dialog(
+                onDismissRequest = { syncDialogVisible = false },
+                properties = DialogProperties(usePlatformDefaultWidth = false),
+            ) {
+                Card(
+                    modifier = Modifier.fillMaxWidth(.92f).widthIn(max = 520.dp),
+                    shape = RoundedCornerShape(18.dp),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                ) {
+                    SyncProgressContent(
+                        progress = sync,
+                        onBackground = { syncDialogVisible = false },
+                        onCancel = syncManager::cancel,
+                        onResume = {
+                            syncManager.resume()
+                            syncDialogVisible = true
+                        },
+                    )
+                }
+            }
         }
     }
 }
@@ -192,6 +247,9 @@ private fun AppNavigationContent(
     onRevalidateKey: () -> Unit,
     onReplaceKey: () -> Unit,
     onRemoveKey: () -> Unit,
+    syncRunning: Boolean,
+    syncDialogVisible: Boolean,
+    onShowSync: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     NavDisplay(
@@ -203,6 +261,8 @@ private fun AppNavigationContent(
                 MarketScreen(
                     onExchangeClick = { navigation.navigate(ExchangeDetailRoute(it)) },
                     onCoinMarketsClick = { navigation.navigate(CoinMarketsRoute(it)) },
+                    syncDialogVisible = syncDialogVisible,
+                    onShowSync = onShowSync,
                 )
             }
             entry<SettingsRoute> {
@@ -212,16 +272,25 @@ private fun AppNavigationContent(
                     onRevalidateKey = onRevalidateKey,
                     onReplaceKey = onReplaceKey,
                     onRemoveKey = onRemoveKey,
+                    syncDialogVisible = syncDialogVisible,
+                    onShowSync = onShowSync,
                 )
             }
             entry<ExchangeDetailRoute> { route ->
-                ExchangeDetailScreen(route.exchangeId, navigation::goBack)
+                ExchangeDetailScreen(
+                    exchangeId = route.exchangeId,
+                    onBack = navigation::goBack,
+                    showSyncIndicator = syncRunning && !syncDialogVisible,
+                    onShowSync = onShowSync,
+                )
             }
             entry<CoinMarketsRoute> { route ->
                 CoinMarketsScreen(
                     coinId = route.coinId,
                     onBack = navigation::goBack,
                     onExchangeClick = { navigation.navigate(ExchangeDetailRoute(it)) },
+                    showSyncIndicator = syncRunning && !syncDialogVisible,
+                    onShowSync = onShowSync,
                 )
             }
         },

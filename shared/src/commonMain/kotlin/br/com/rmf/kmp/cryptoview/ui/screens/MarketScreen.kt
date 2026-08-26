@@ -27,8 +27,6 @@ import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -51,8 +49,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.window.Dialog
-import androidx.compose.ui.window.DialogProperties
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import br.com.rmf.kmp.cryptoview.currentTimeMillis
@@ -69,7 +65,7 @@ import br.com.rmf.kmp.cryptoview.ui.components.OutlinedCard
 import br.com.rmf.kmp.cryptoview.ui.components.PrimaryActionButton
 import br.com.rmf.kmp.cryptoview.ui.components.RemoteBrandLogo
 import br.com.rmf.kmp.cryptoview.ui.components.SparklineChart
-import br.com.rmf.kmp.cryptoview.ui.components.SyncProgressContent
+import br.com.rmf.kmp.cryptoview.ui.components.SyncRunningAction
 import br.com.rmf.kmp.cryptoview.ui.components.VariationPill
 import br.com.rmf.kmp.cryptoview.ui.theme.CryptoBorder
 import br.com.rmf.kmp.cryptoview.ui.theme.CryptoOrange
@@ -87,6 +83,8 @@ private enum class MarketTab { Coins, Exchanges }
 fun MarketScreen(
     onExchangeClick: (Long) -> Unit,
     onCoinMarketsClick: (Long) -> Unit,
+    syncDialogVisible: Boolean,
+    onShowSync: () -> Unit,
 ) {
     val marketViewModel = viewModel<MarketViewModel> {
         KoinPlatformTools.defaultContext().get().get<MarketViewModel>()
@@ -95,15 +93,11 @@ fun MarketScreen(
     val sync by marketViewModel.syncState.collectAsStateWithLifecycle()
     val floatingNavigationPadding = LocalFloatingNavigationContentPadding.current
     var tabName by rememberSaveable { mutableStateOf(MarketTab.Coins.name) }
-    var showSync by rememberSaveable { mutableStateOf(false) }
     val tab = MarketTab.valueOf(tabName)
     val coinGridState = rememberLazyGridState()
     val exchangeGridState = rememberLazyGridState()
     val gridState = if (tab == MarketTab.Coins) coinGridState else exchangeGridState
 
-    LaunchedEffect(sync.status) {
-        if (sync.status == SyncStatus.RUNNING) showSync = true
-    }
     LaunchedEffect(tab, gridState) {
         snapshotFlow {
             val layout = gridState.layoutInfo
@@ -143,6 +137,7 @@ fun MarketScreen(
                     selectedCoins = tab == MarketTab.Coins,
                     lastFetchedAt = state.coins.maxOfOrNull { it.quoteFetchedAt ?: 0L }?.takeIf { it > 0L },
                     syncing = sync.status == SyncStatus.RUNNING,
+                    showSyncIndicator = sync.status == SyncStatus.RUNNING && !syncDialogVisible,
                     sortOrder = state.sortOrder,
                     variation = state.variationFilter,
                     exchangeFilters = state.availableExchangeFilters,
@@ -162,9 +157,10 @@ fun MarketScreen(
                         tabName = MarketTab.Exchanges.name
                     },
                     onSync = {
-                        marketViewModel.synchronize()
-                        showSync = true
+                        if (sync.status != SyncStatus.RUNNING) marketViewModel.synchronize()
+                        onShowSync()
                     },
+                    onShowSync = onShowSync,
                 )
             }
 
@@ -230,25 +226,6 @@ fun MarketScreen(
             }
         }
 
-        if (showSync) {
-            Dialog(
-                onDismissRequest = { showSync = false },
-                properties = DialogProperties(usePlatformDefaultWidth = false),
-            ) {
-                Card(
-                    modifier = Modifier.fillMaxWidth(.92f).widthIn(max = 520.dp),
-                    shape = RoundedCornerShape(18.dp),
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                ) {
-                    SyncProgressContent(
-                        progress = sync,
-                        onBackground = { showSync = false },
-                        onCancel = marketViewModel::cancelSync,
-                        onResume = marketViewModel::resumeSync,
-                    )
-                }
-            }
-        }
     }
 }
 
@@ -260,6 +237,7 @@ private fun MarketHeader(
     selectedCoins: Boolean,
     lastFetchedAt: Long?,
     syncing: Boolean,
+    showSyncIndicator: Boolean,
     sortOrder: CoinSortOrder,
     variation: CoinVariationFilter,
     exchangeFilters: List<ExchangeSummary>,
@@ -276,11 +254,15 @@ private fun MarketHeader(
     onCoinsClick: () -> Unit,
     onExchangesClick: () -> Unit,
     onSync: () -> Unit,
+    onShowSync: () -> Unit,
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text("Mercado", style = MaterialTheme.typography.displaySmall)
             Spacer(Modifier.weight(1f))
+            if (showSyncIndicator) {
+                SyncRunningAction(onClick = onShowSync)
+            }
             if (!searchVisible) {
                 IconButton(onClick = onShowSearch) {
                     CryptoIcon(CryptoIcon.Search, "Buscar", Modifier.size(25.dp))

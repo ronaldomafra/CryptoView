@@ -1,6 +1,6 @@
 # CryptoView — checklist de desenvolvimento
 
-Checkpoint atualizado em 25/08/2026. A marcação indica código implementado; validações manuais continuam separadas.
+Checkpoint atualizado em 26/08/2026. A marcação indica código implementado; validações manuais continuam separadas.
 
 ## Tasks
 
@@ -21,6 +21,9 @@ Checkpoint atualizado em 25/08/2026. A marcação indica código implementado; v
 - [x] Busca local sobre o banco
 - [x] Expansão exclusiva de moeda com cotação, gráfico e mercados
 - [x] Modal exibe o progresso real confirmado pelo banco
+- [x] Modal de sincronização usa progresso horizontal por etapas e por itens persistidos
+- [x] Fechar o modal mantém o processamento em segundo plano sem reabertura automática na mesma execução
+- [x] Indicador de sincronização nas top bars permite reabrir o acompanhamento
 - [x] Detalhe da corretora carrega ativos por demanda
 - [x] Ajustes exibe uso da API, sincronização, substituição, remoção e limpeza de cache
 - [x] Logos remotos possuem fallback local discreto
@@ -54,14 +57,18 @@ Checkpoint atualizado em 25/08/2026. A marcação indica código implementado; v
 - [x] Testes de armazenamento seguro e consulta de chave
 - [x] Testes de parsing das duas formas de cotação USD
 - [x] Testes de reserva de cota e percentual de progresso
-- [x] Teste Android host: 23 testes aprovados em 25/08/2026
+- [x] Teste Android host: 30 testes aprovados em 26/08/2026
 - [x] Compilação `:shared:compileAndroidMain` aprovada
 - [x] Compilação cruzada `:shared:compileKotlinIosSimulatorArm64` aprovada no host Linux
+- [x] Validar inicialização e sincronização Android no Logcat, sem crash nem bloqueio do SQLite
+- [x] Confirmar que a API key permanece redigida nos logs Android
+- [x] Confirmar que o `403` de corretoras não bloqueia métricas e sincronização de moedas
+- [x] Validar manualmente o aplicativo iOS em macOS/Xcode após a integração (26/08/2026)
 - [ ] Testes do banco: upsert, rollback, FK, retomada e múltiplas conexões
 - [ ] Testes do coordenador: paralelismo, backpressure, retry, cancelamento e checkpoint
 - [ ] Testes de ViewModel: startup, polling, troca rápida e erros independentes
 - [ ] Testes Compose das telas e snapshots
-- [ ] Revalidar target e testes iOS em macOS/Xcode após esta integração
+- [ ] Automatizar build e testes iOS em runner macOS
 - [x] Executar build completo `:androidApp:assembleDebug`
 - [ ] Executar roteiro manual Android com dados reais
 

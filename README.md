@@ -2,7 +2,7 @@
 
 Aplicativo Kotlin Multiplatform/Compose Multiplatform para consultar moedas e corretoras da CoinMarketCap, com Android como plataforma principal e host iOS compartilhando UI e regras de negócio.
 
-## Status atual — 25/08/2026
+## Status atual — 26/08/2026
 
 - API key integrada ao onboarding, startup e ajustes, sem rota temporária de testes.
 - Android utiliza Keystore + AES-256-GCM; iOS utiliza Swift, CryptoKit e Keychain, sem CocoaPods.
@@ -10,7 +10,10 @@ Aplicativo Kotlin Multiplatform/Compose Multiplatform para consultar moedas e co
 - Sincronização coordenada com páginas paralelas, rate limit, transações por batch, pool, WAL, checkpoint, cancelamento e retomada.
 - Histórico e mercados são carregados ao abrir uma moeda; ativos são carregados ao abrir uma corretora.
 - Polling de 60 segundos ocorre somente para a moeda expandida.
-- Compilação compartilhada Android e 20 testes Android host aprovados; revalidação iOS desta integração requer macOS/Xcode.
+- Compilação compartilhada Android e 30 testes Android host aprovados.
+- Sincronização apresentada com progresso horizontal por etapas; ao fechar o modal, a execução continua em segundo plano e pode ser reaberta pelo indicador da top bar.
+- Inicialização e sincronização Android validadas em dispositivo real, sem crash nem bloqueio do SQLite; restrições `403` do plano são tratadas sem interromper a sincronização das moedas.
+- Aplicativo iOS validado manualmente em macOS/Xcode em 26/08/2026.
 
 ## Arquitetura da sincronização
 
@@ -43,6 +46,6 @@ A UI compartilhada segue esse conjunto visual no onboarding, mercado, busca/filt
 ## Limitações atuais
 
 - Market pairs, histórico e ativos podem retornar `403` conforme o plano; a UI mantém as demais seções disponíveis.
-- O Windows não executa testes do simulador iOS; a integração atual precisa ser revalidada em macOS/Xcode.
+- A validação manual do iOS foi aprovada; a automação do build e dos testes em runner macOS ainda está pendente.
 - Benchmarks de paralelismo, pool e batches ainda não foram executados.
-- Filtros locais avançados e estados visuais offline/desatualizado permanecem no próximo recorte.
+- Estados visuais offline/desatualizado permanecem no próximo recorte.

@@ -37,6 +37,7 @@ import br.com.rmf.kmp.cryptoview.ui.components.OutlinedCard
 import br.com.rmf.kmp.cryptoview.ui.components.LocalFloatingNavigationContentPadding
 import br.com.rmf.kmp.cryptoview.ui.components.CryptoIcon
 import br.com.rmf.kmp.cryptoview.ui.components.RemoteBrandLogo
+import br.com.rmf.kmp.cryptoview.ui.components.SyncRunningAction
 import br.com.rmf.kmp.cryptoview.ui.theme.CryptoOrange
 import br.com.rmf.kmp.cryptoview.ui.utils.formatUsd
 import br.com.rmf.kmp.cryptoview.ui.viewmodel.CoinMarketsViewModel
@@ -47,6 +48,8 @@ fun CoinMarketsScreen(
     coinId: Long,
     onBack: () -> Unit,
     onExchangeClick: (Long) -> Unit,
+    showSyncIndicator: Boolean,
+    onShowSync: () -> Unit,
 ) {
     val marketsViewModel = viewModel<CoinMarketsViewModel> {
         KoinPlatformTools.defaultContext().get().get<CoinMarketsViewModel>()
@@ -74,6 +77,8 @@ fun CoinMarketsScreen(
                     Text("Onde comprar", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     Text(state.coin?.name ?: "Moeda", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
                 }
+                Spacer(Modifier.weight(1f))
+                if (showSyncIndicator) SyncRunningAction(onClick = onShowSync)
             }
         }
         if (state.loading && state.markets.isEmpty()) item { CircularProgressIndicator(Modifier.size(24.dp), strokeWidth = 2.dp) }

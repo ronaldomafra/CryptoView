@@ -17,14 +17,11 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -33,8 +30,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.window.Dialog
-import androidx.compose.ui.window.DialogProperties
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import br.com.rmf.kmp.cryptoview.domain.model.CoinMarketCapKeyInfo
@@ -44,7 +39,7 @@ import br.com.rmf.kmp.cryptoview.ui.components.LocalFloatingNavigationContentPad
 import br.com.rmf.kmp.cryptoview.ui.components.OutlinedCard
 import br.com.rmf.kmp.cryptoview.ui.components.PrimaryActionButton
 import br.com.rmf.kmp.cryptoview.ui.components.SettingsDivider
-import br.com.rmf.kmp.cryptoview.ui.components.SyncProgressContent
+import br.com.rmf.kmp.cryptoview.ui.components.SyncRunningAction
 import br.com.rmf.kmp.cryptoview.ui.theme.CryptoNegative
 import br.com.rmf.kmp.cryptoview.ui.theme.CryptoOrange
 import br.com.rmf.kmp.cryptoview.ui.viewmodel.SettingsViewModel
@@ -57,18 +52,17 @@ fun SettingsScreen(
     onRevalidateKey: () -> Unit,
     onReplaceKey: () -> Unit,
     onRemoveKey: () -> Unit,
+    syncDialogVisible: Boolean,
+    onShowSync: () -> Unit,
 ) {
     val settingsViewModel = viewModel<SettingsViewModel> {
         KoinPlatformTools.defaultContext().get().get<SettingsViewModel>()
     }
     val data by settingsViewModel.dataState.collectAsStateWithLifecycle()
     val sync by settingsViewModel.syncState.collectAsStateWithLifecycle()
-    var showSync by rememberSaveable { mutableStateOf(false) }
     var showClear by rememberSaveable { mutableStateOf(false) }
     var showRemove by rememberSaveable { mutableStateOf(false) }
     val floatingNavigationPadding = LocalFloatingNavigationContentPadding.current
-
-    LaunchedEffect(sync.status) { if (sync.status == SyncStatus.RUNNING) showSync = true }
 
     Box(
         Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing),
@@ -84,7 +78,15 @@ fun SettingsScreen(
             ),
             verticalArrangement = Arrangement.spacedBy(18.dp),
         ) {
-            item { Text("Ajustes", style = MaterialTheme.typography.displaySmall) }
+            item {
+                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                    Text("Ajustes", style = MaterialTheme.typography.displaySmall)
+                    Spacer(Modifier.weight(1f))
+                    if (sync.status == SyncStatus.RUNNING && !syncDialogVisible) {
+                        SyncRunningAction(onClick = onShowSync)
+                    }
+                }
+            }
             item {
                 Text("API CoinMarketCap", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
                 Spacer(Modifier.height(10.dp))
@@ -125,8 +127,8 @@ fun SettingsScreen(
                         PrimaryActionButton(
                             "Sincronizar agora",
                             onClick = {
-                                settingsViewModel.synchronize()
-                                showSync = true
+                                if (sync.status != SyncStatus.RUNNING) settingsViewModel.synchronize()
+                                onShowSync()
                             },
                             modifier = Modifier.fillMaxWidth(),
                         )
@@ -141,23 +143,6 @@ fun SettingsScreen(
             }
         }
 
-        if (showSync) Dialog(
-            onDismissRequest = { showSync = false },
-            properties = DialogProperties(usePlatformDefaultWidth = false),
-        ) {
-            Card(
-                modifier = Modifier.fillMaxWidth(.92f).widthIn(max = 520.dp),
-                shape = androidx.compose.foundation.shape.RoundedCornerShape(18.dp),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-            ) {
-                SyncProgressContent(
-                    progress = sync,
-                    onBackground = { showSync = false },
-                    onCancel = settingsViewModel::cancelSync,
-                    onResume = settingsViewModel::resumeSync,
-                )
-            }
-        }
     }
 
     if (showClear) ConfirmDialog(

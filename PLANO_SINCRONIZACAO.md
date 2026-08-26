@@ -50,3 +50,12 @@ Refatoração posterior simplificou a implementação para um único coordenador
 - Histórico não participa da sincronização global.
 - Relações moeda–corretora são carregadas por demanda porque o endpoint é por moeda e pode depender do plano.
 - A chave de desenvolvimento nunca deve ser salva em código, documentação, fixture, comando ou log.
+
+## Validações posteriores — 26/08/2026
+
+- Android executado em dispositivo real sem crash, `FATAL EXCEPTION` ou bloqueio do SQLite.
+- Configuração WAL aplicada de forma consistente antes da abertura das conexões.
+- Restrição `403` no catálogo de corretoras tratada como resultado parcial; métricas e páginas de moedas continuam sendo sincronizadas.
+- API key confirmada como redigida nos logs Android.
+- Aplicativo iOS testado manualmente em macOS/Xcode e aprovado.
+- Permanecem pendentes a automação iOS em runner macOS, o roteiro visual completo Android e os benchmarks de concorrência/batches.

@@ -1,12 +1,14 @@
 # CryptoView — próximos passos
 
-Checkpoint de implementação em 25/08/2026.
+Checkpoint de implementação em 26/08/2026.
 
 ## Estado atual
 
 O marco de API key, banco local-first e sincronização foi implementado. O app inicia pelo estado real da credencial segura, executa uma sincronização em etapas e apresenta dados do SQLDelight. Moedas, corretoras e metadados entram no banco em batches à medida que as páginas retornam. Histórico, mercados de uma moeda e ativos da corretora permanecem sob demanda.
 
 O desenho adotado é uma versão simplificada do projeto de referência: guarda de execução única, preflight de credencial/cota, passos sequenciais, páginas paralelas dentro de cada passo, pool limitado, transações por página, checkpoints e retomada. A API key não é propagada pelo pipeline; ela é obtida somente pelo executor autenticado no instante da requisição.
+
+A execução Android em dispositivo real está estável, sem crash ou bloqueio do SQLite, e continua a sincronização das moedas quando o catálogo de corretoras retorna `403` por restrição do plano. O aplicativo iOS foi validado manualmente e aprovado em macOS/Xcode em 26/08/2026.
 
 ## Próximo marco — robustez e evidências
 
@@ -38,7 +40,8 @@ O desenho adotado é uma versão simplificada do projeto de referência: guarda 
 - Coordenador: execução única, cota reservada, progresso pós-commit e resume.
 - ViewModels: startup, remoção da chave, expansão exclusiva e troca rápida.
 - Compose: onboarding, mercado, detalhe, ajustes e modal.
-- Build/teste iOS em macOS; build completo e roteiro manual Android.
+- Automatização de build/testes iOS em runner macOS; validação manual já aprovada.
+- Roteiro manual Android completo, incluindo navegação e dados reais.
 
 ## Critério para encerrar o próximo marco
 
