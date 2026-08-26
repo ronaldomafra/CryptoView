@@ -20,6 +20,10 @@ captures/
 .externalNativeBuild/
 .cxx/
 
+# Arquivos temporários e ferramentas locais
+/temp/
+/androidApp/release/
+
 # Xcode
 *.xcodeproj/*
 !*.xcodeproj/project.pbxproj
@@ -30,5 +34,3 @@ captures/
 
 # Dependências JavaScript
 node_modules/
-/.agentboard/
-/tests/
