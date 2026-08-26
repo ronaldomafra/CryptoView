@@ -1,5 +1,7 @@
 package br.com.rmf.kmp.cryptoview.data.api
 
+import br.com.rmf.kmp.cryptoview.domain.model.api.CoinHistoryDto
+import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
@@ -27,3 +29,22 @@ internal fun JsonObject?.doubleValue(name: String): Double? =
 internal fun JsonObject?.stringValue(name: String): String? =
     this?.get(name)?.jsonPrimitive?.content
 
+internal fun JsonElement.coinHistoryDto(coinId: Long): CoinHistoryDto? {
+    val candidate = when (this) {
+        is JsonArray -> firstOrNull { element ->
+            (element as? JsonObject)?.get("id")?.jsonPrimitive?.content == coinId.toString()
+        } ?: firstOrNull()
+        is JsonObject -> when {
+            containsKey("quotes") -> this
+            containsKey(coinId.toString()) -> get(coinId.toString())
+            else -> values.firstOrNull { element ->
+                (element as? JsonObject)?.get("id")?.jsonPrimitive?.content == coinId.toString()
+            } ?: values.firstOrNull()
+        }
+        else -> null
+    } ?: return null
+
+    return runCatching {
+        cryptoNetworkJson.decodeFromString<CoinHistoryDto>(candidate.toString())
+    }.getOrNull()
+}

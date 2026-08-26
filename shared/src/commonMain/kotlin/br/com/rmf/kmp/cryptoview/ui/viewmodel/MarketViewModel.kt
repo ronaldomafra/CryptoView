@@ -3,6 +3,7 @@ package br.com.rmf.kmp.cryptoview.ui.viewmodel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import br.com.rmf.kmp.cryptoview.domain.model.CoinSortOrder
+import br.com.rmf.kmp.cryptoview.domain.model.CoinHistoryRange
 import br.com.rmf.kmp.cryptoview.domain.model.CoinVariationFilter
 import br.com.rmf.kmp.cryptoview.domain.model.SyncPhase
 import br.com.rmf.kmp.cryptoview.domain.model.SyncStatus
@@ -36,6 +37,7 @@ class MarketViewModel internal constructor(
     private var exchangeLoadJob: Job? = null
     private var queryJob: Job? = null
     private var detailJob: Job? = null
+    private var historyJob: Job? = null
     private var pollingJob: Job? = null
 
     private val _uiState = MutableStateFlow(
@@ -239,6 +241,8 @@ class MarketViewModel internal constructor(
             expandedCoinId = id,
             expandedMarkets = emptyList(),
             expandedHistory = emptyList(),
+            selectedHistoryRange = CoinHistoryRange.HOURS_24,
+            historyLoading = true,
             detailsLoading = true,
             marketsError = null,
             historyError = null,
@@ -261,19 +265,14 @@ class MarketViewModel internal constructor(
                 }
             }
             launch {
-                repository.observeHistory(id).collect { history ->
-                    _uiState.value = _uiState.value.copy(expandedHistory = history)
-                }
-            }
-            launch {
                 val result = repository.refreshCoinDetails(id)
                 _uiState.value = _uiState.value.copy(
                     detailsLoading = false,
                     marketsError = result.marketsError,
-                    historyError = result.historyError,
                 )
             }
         }
+        loadHistory(id, CoinHistoryRange.HOURS_24)
         pollingJob = viewModelScope.launch {
             while (true) {
                 delay(POLLING_INTERVAL_MILLIS)
@@ -283,10 +282,44 @@ class MarketViewModel internal constructor(
         }
     }
 
+    fun selectHistoryRange(range: CoinHistoryRange) {
+        val coinId = _uiState.value.expandedCoinId ?: return
+        if (_uiState.value.selectedHistoryRange == range) return
+        historyJob?.cancel()
+        _uiState.value = _uiState.value.copy(
+            selectedHistoryRange = range,
+            expandedHistory = emptyList(),
+            historyLoading = true,
+            historyError = null,
+        )
+        loadHistory(coinId, range)
+    }
+
+    private fun loadHistory(coinId: Long, range: CoinHistoryRange) {
+        historyJob?.cancel()
+        historyJob = viewModelScope.launch {
+            launch {
+                repository.observeHistory(coinId, range).collect { history ->
+                    val state = _uiState.value
+                    if (state.expandedCoinId == coinId && state.selectedHistoryRange == range) {
+                        _uiState.value = state.copy(expandedHistory = history)
+                    }
+                }
+            }
+            val error = repository.refreshHistory(coinId, range, force = true)
+            val state = _uiState.value
+            if (state.expandedCoinId == coinId && state.selectedHistoryRange == range) {
+                _uiState.value = state.copy(historyLoading = false, historyError = error)
+            }
+        }
+    }
+
     fun stopCoinDetails() {
         detailJob?.cancel()
+        historyJob?.cancel()
         pollingJob?.cancel()
         detailJob = null
+        historyJob = null
         pollingJob = null
     }
 

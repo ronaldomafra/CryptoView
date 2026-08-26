@@ -20,6 +20,8 @@ Checkpoint atualizado em 26/08/2026. A marcação indica código implementado; v
 - [x] Mercado observa moedas e corretoras do SQLDelight
 - [x] Busca local sobre o banco
 - [x] Expansão exclusiva de moeda com cotação, gráfico e mercados
+- [x] Gráfico histórico sob demanda com períodos `24H`, `7D`, `30D` e `1A`
+- [x] Estados de carregamento, cache e restrição de plano isolados no histórico
 - [x] Modal exibe o progresso real confirmado pelo banco
 - [x] Modal de sincronização usa progresso horizontal por etapas e por itens persistidos
 - [x] Fechar o modal mantém o processamento em segundo plano sem reabertura automática na mesma execução
@@ -48,6 +50,8 @@ Checkpoint atualizado em 26/08/2026. A marcação indica código implementado; v
 - [x] Startup atualiza somente corretoras essenciais quando o cache expirou
 - [x] Metadados de moedas/corretoras em lote
 - [x] Histórico, mercados e ativos fora da sincronização global
+- [x] Histórico V3 com parsing flexível e no máximo 100 pontos/um crédito por consulta
+- [x] Cache histórico separado por moeda/período com migração dos dados existentes para `24H`
 - [x] Polling de 60 segundos somente para a moeda expandida
 - [ ] Instrumentar métricas e executar benchmark pool 1×2 e paralelismo 1×5×10
 - [ ] Avaliar um tratamento explícito de lifecycle/background além da saída da composição
@@ -57,13 +61,15 @@ Checkpoint atualizado em 26/08/2026. A marcação indica código implementado; v
 - [x] Testes de armazenamento seguro e consulta de chave
 - [x] Testes de parsing das duas formas de cotação USD
 - [x] Testes de reserva de cota e percentual de progresso
-- [x] Teste Android host: 30 testes aprovados em 26/08/2026
+- [x] Teste Android host: 33 testes aprovados em 26/08/2026
+- [x] Verificação da migração SQLDelight aprovada
 - [x] Compilação `:shared:compileAndroidMain` aprovada
 - [x] Compilação cruzada `:shared:compileKotlinIosSimulatorArm64` aprovada no host Linux
 - [x] Validar inicialização e sincronização Android no Logcat, sem crash nem bloqueio do SQLite
 - [x] Confirmar que a API key permanece redigida nos logs Android
 - [x] Confirmar que o `403` de corretoras não bloqueia métricas e sincronização de moedas
 - [x] Validar manualmente o aplicativo iOS em macOS/Xcode após a integração (26/08/2026)
+- [ ] Revalidar no iOS o seletor e as consultas históricas por período
 - [ ] Testes do banco: upsert, rollback, FK, retomada e múltiplas conexões
 - [ ] Testes do coordenador: paralelismo, backpressure, retry, cancelamento e checkpoint
 - [ ] Testes de ViewModel: startup, polling, troca rápida e erros independentes

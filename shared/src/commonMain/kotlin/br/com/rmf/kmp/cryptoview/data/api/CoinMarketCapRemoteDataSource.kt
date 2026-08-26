@@ -1,6 +1,8 @@
 package br.com.rmf.kmp.cryptoview.data.api
 
 import br.com.rmf.kmp.cryptoview.domain.model.ApiResult
+import br.com.rmf.kmp.cryptoview.domain.model.CoinHistoryRange
+import br.com.rmf.kmp.cryptoview.domain.model.CryptoError
 import br.com.rmf.kmp.cryptoview.domain.model.api.CoinHistoryDto
 import br.com.rmf.kmp.cryptoview.domain.model.api.CoinListingDto
 import br.com.rmf.kmp.cryptoview.domain.model.api.CoinMarketPairsDto
@@ -13,6 +15,7 @@ import br.com.rmf.kmp.cryptoview.domain.model.api.KeyInfoDto
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.emitAll
 import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.map
 
 internal class CoinMarketCapRemoteDataSource(
     private val service: CoinMarketCapService,
@@ -47,8 +50,30 @@ internal class CoinMarketCapRemoteDataSource(
         requestExecutor.execute { service.getCoinQuotes(it, ids.joinToString(",")) }
     }
 
-    fun coinHistory(id: Long): Flow<ApiResult<CoinHistoryDto>> = authenticated {
-        requestExecutor.execute { service.getCoinHistory(it, id) }
+    fun coinHistory(id: Long, range: CoinHistoryRange): Flow<ApiResult<CoinHistoryDto>> = authenticated { apiKey ->
+        requestExecutor.execute {
+            service.getCoinHistory(
+                apiKey = apiKey,
+                id = id,
+                interval = range.interval,
+                count = range.count,
+            )
+        }.map { result ->
+            when (result) {
+                is ApiResult.Failure -> result
+                is ApiResult.Success -> {
+                    val history = result.data.coinHistoryDto(id)
+                    val hasPricePoints = history?.quotes.orEmpty().any { quote ->
+                        quote.timestamp != null && quote.quote.usdQuote().doubleValue("price") != null
+                    }
+                    if (!hasPricePoints) {
+                        ApiResult.Failure(CryptoError.InvalidResponse("Histórico da moeda ausente"))
+                    } else {
+                        ApiResult.Success(requireNotNull(history), result.metadata)
+                    }
+                }
+            }
+        }
     }
 
     fun coinMarketPairs(id: Long): Flow<ApiResult<CoinMarketPairsDto>> = authenticated {

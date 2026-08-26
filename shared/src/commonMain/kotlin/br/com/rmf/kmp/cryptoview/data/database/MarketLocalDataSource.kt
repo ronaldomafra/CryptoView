@@ -4,6 +4,7 @@ import br.com.rmf.kmp.cryptoview.currentTimeMillis
 import br.com.rmf.kmp.cryptoview.database.CryptoDatabase
 import br.com.rmf.kmp.cryptoview.domain.model.CoinExchangeMarket
 import br.com.rmf.kmp.cryptoview.domain.model.CoinHistoryPoint
+import br.com.rmf.kmp.cryptoview.domain.model.CoinHistoryRange
 import br.com.rmf.kmp.cryptoview.domain.model.CoinSummary
 import br.com.rmf.kmp.cryptoview.domain.model.CoinSortOrder
 import br.com.rmf.kmp.cryptoview.domain.model.CoinVariationFilter
@@ -105,8 +106,8 @@ internal class MarketLocalDataSource(
         }.executeAsList()
     }.flowOn(Dispatchers.Default)
 
-    fun observeHistory(coinId: Long): Flow<List<CoinHistoryPoint>> = pool.changeVersion.map {
-        database.marketQueries.selectCoinHistory(coinId) { _, timestamp, price, _ ->
+    fun observeHistory(coinId: Long, range: CoinHistoryRange): Flow<List<CoinHistoryPoint>> = pool.changeVersion.map {
+        database.marketQueries.selectCoinHistory(coinId, range.name) { _, _, timestamp, price, _ ->
             CoinHistoryPoint(timestamp, price)
         }.executeAsList()
     }.flowOn(Dispatchers.Default)
@@ -335,22 +336,25 @@ internal class MarketLocalDataSource(
             pool.onBatchCommitted(connection.driver)
         }
 
-    suspend fun replaceHistory(coinId: Long, data: CoinHistoryDto) =
+    suspend fun replaceHistory(coinId: Long, range: CoinHistoryRange, data: CoinHistoryDto) =
         pool.withConnection { connection ->
             val now = currentTimeMillis()
             connection.database.transaction {
-                connection.database.marketQueries.deleteCoinHistory(coinId)
+                connection.database.marketQueries.deleteCoinHistory(coinId, range.name)
                 data.quotes.orEmpty().forEach { dto ->
                     val timestamp = dto.timestamp ?: return@forEach
                     val price = dto.quote.usdQuote().doubleValue("price") ?: return@forEach
-                    connection.database.marketQueries.replaceHistoryPoint(coinId, timestamp, price, now)
+                    connection.database.marketQueries.replaceHistoryPoint(coinId, range.name, timestamp, price, now)
                 }
                 connection.database.marketQueries.upsertResourceState(
-                    "coin_history:$coinId", now, now, "SUCCESS", null,
+                    historyResourceKey(coinId, range), now, now, "SUCCESS", null,
                 )
             }
             pool.onBatchCommitted(connection.driver)
         }
+
+    fun historyResourceKey(coinId: Long, range: CoinHistoryRange): String =
+        "coin_history:$coinId:${range.name}"
 
     suspend fun replaceQuote(coinId: Long, dto: CoinListingDto) = pool.withConnection { connection ->
         val usd = dto.quote.usdQuote()

@@ -53,10 +53,13 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import br.com.rmf.kmp.cryptoview.currentTimeMillis
 import br.com.rmf.kmp.cryptoview.domain.model.CoinExchangeMarket
+import br.com.rmf.kmp.cryptoview.domain.model.CoinHistoryPoint
+import br.com.rmf.kmp.cryptoview.domain.model.CoinHistoryRange
 import br.com.rmf.kmp.cryptoview.domain.model.CoinSortOrder
 import br.com.rmf.kmp.cryptoview.domain.model.CoinSummary
 import br.com.rmf.kmp.cryptoview.domain.model.CoinVariationFilter
 import br.com.rmf.kmp.cryptoview.domain.model.ExchangeSummary
+import br.com.rmf.kmp.cryptoview.domain.model.CryptoError
 import br.com.rmf.kmp.cryptoview.domain.model.SyncStatus
 import br.com.rmf.kmp.cryptoview.ui.components.CryptoIcon
 import br.com.rmf.kmp.cryptoview.ui.components.MarketTabs
@@ -191,12 +194,15 @@ fun MarketScreen(
                         coin = coin,
                         expanded = coin.id == state.expandedCoinId,
                         loading = state.detailsLoading,
-                        history = state.expandedHistory.map { it.priceUsd.toFloat() },
+                        history = state.expandedHistory,
+                        historyRange = state.selectedHistoryRange,
+                        historyLoading = state.historyLoading,
                         markets = state.expandedMarkets,
                         pollingIntervalSeconds = state.pollingIntervalSeconds,
-                        detailsMessage = state.historyError?.let { "Histórico indisponível para esta chave." }
-                            ?: state.marketsError?.let { "Corretoras indisponíveis para esta chave." },
+                        historyMessage = historyErrorMessage(state.historyError),
+                        marketsMessage = state.marketsError?.let { "Corretoras indisponíveis para esta chave." },
                         onClick = { marketViewModel.expandCoin(coin.id) },
+                        onHistoryRangeChange = marketViewModel::selectHistoryRange,
                         onViewAll = { onCoinMarketsClick(coin.id) },
                     )
                 }
@@ -457,11 +463,15 @@ private fun CoinCard(
     coin: CoinSummary,
     expanded: Boolean,
     loading: Boolean,
-    history: List<Float>,
+    history: List<CoinHistoryPoint>,
+    historyRange: CoinHistoryRange,
+    historyLoading: Boolean,
     markets: List<CoinExchangeMarket>,
     pollingIntervalSeconds: Long,
-    detailsMessage: String?,
+    historyMessage: String?,
+    marketsMessage: String?,
     onClick: () -> Unit,
+    onHistoryRangeChange: (CoinHistoryRange) -> Unit,
     onViewAll: () -> Unit,
 ) {
     OutlinedCard(
@@ -492,17 +502,45 @@ private fun CoinCard(
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     }
-                    Text("Últimas 24 horas", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-                    if (loading && history.isEmpty()) {
+                    Text("Histórico de preço", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                    HistoryRangeSelector(historyRange, onHistoryRangeChange)
+                    if (historyLoading && history.isEmpty()) {
                         Box(Modifier.fillMaxWidth().height(132.dp), contentAlignment = Alignment.Center) {
                             CircularProgressIndicator(Modifier.size(28.dp), strokeWidth = 2.dp)
                         }
                     }
-                    if (history.isNotEmpty()) SparklineChart(history, Modifier.height(156.dp))
+                    if (history.isNotEmpty()) {
+                        Box(Modifier.fillMaxWidth()) {
+                            SparklineChart(history, historyRange, Modifier.height(156.dp))
+                            if (historyLoading) {
+                                CircularProgressIndicator(
+                                    Modifier.align(Alignment.TopEnd).padding(8.dp).size(18.dp),
+                                    strokeWidth = 2.dp,
+                                    color = CryptoOrange,
+                                )
+                            }
+                        }
+                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                            Text(historyStartLabel(historyRange), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text("Agora", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                    } else if (!historyLoading && historyMessage == null) {
+                        Text("Nenhum ponto histórico disponível para este período.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                    historyMessage?.let {
+                        Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
+                    }
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                        Metric("Mín. 24h", formatUsd(history.minOrNull()?.toDouble()))
-                        Metric("Máx. 24h", formatUsd(history.maxOrNull()?.toDouble()), Alignment.CenterHorizontally)
+                        Metric("Mín. ${historyRange.metricSuffix}", formatUsd(history.minOfOrNull { it.priceUsd }))
+                        Metric("Máx. ${historyRange.metricSuffix}", formatUsd(history.maxOfOrNull { it.priceUsd }), Alignment.CenterHorizontally)
                         Metric("Volume 24h", formatCompactUsd(coin.volume24hUsd), Alignment.End)
+                    }
+                    if (loading && markets.isEmpty()) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp, color = CryptoOrange)
+                            Spacer(Modifier.width(8.dp))
+                            Text("Carregando mercados…", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
                     }
                     if (markets.isNotEmpty()) {
                         Text("Disponível em", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
@@ -530,7 +568,7 @@ private fun CoinCard(
                             }
                         }
                     }
-                    detailsMessage?.let {
+                    marketsMessage?.let {
                         Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
                     }
                     Text(
@@ -543,6 +581,48 @@ private fun CoinCard(
             }
         }
     }
+}
+
+@Composable
+private fun HistoryRangeSelector(
+    selected: CoinHistoryRange,
+    onSelect: (CoinHistoryRange) -> Unit,
+) {
+    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+        CoinHistoryRange.entries.forEach { range ->
+            val active = range == selected
+            Surface(
+                modifier = Modifier.weight(1f).clickable(enabled = !active) { onSelect(range) },
+                shape = RoundedCornerShape(10.dp),
+                color = if (active) CryptoOrangeSoft else MaterialTheme.colorScheme.surface,
+                border = BorderStroke(.75.dp, if (active) CryptoOrange else CryptoBorder),
+            ) {
+                Text(
+                    range.label,
+                    modifier = Modifier.padding(vertical = 7.dp),
+                    color = if (active) CryptoOrange else MaterialTheme.colorScheme.onSurfaceVariant,
+                    style = MaterialTheme.typography.labelMedium,
+                    fontWeight = if (active) FontWeight.SemiBold else FontWeight.Medium,
+                    textAlign = TextAlign.Center,
+                )
+            }
+        }
+    }
+}
+
+private fun historyStartLabel(range: CoinHistoryRange): String = when (range) {
+    CoinHistoryRange.HOURS_24 -> "24h atrás"
+    CoinHistoryRange.DAYS_7 -> "7d atrás"
+    CoinHistoryRange.DAYS_30 -> "30d atrás"
+    CoinHistoryRange.YEAR_1 -> "1 ano atrás"
+}
+
+private fun historyErrorMessage(error: CryptoError?): String? = when (error) {
+    null -> null
+    is CryptoError.PlanUnavailable -> "Histórico indisponível no plano atual."
+    CryptoError.NoConnection -> "Sem conexão. Exibindo o último histórico salvo, quando disponível."
+    CryptoError.Timeout -> "A consulta do histórico demorou mais que o esperado."
+    else -> "Não foi possível atualizar o histórico desta moeda."
 }
 
 @Composable

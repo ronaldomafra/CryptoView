@@ -99,6 +99,7 @@ sqldelight {
         create("CryptoDatabase") {
             packageName.set("br.com.rmf.kmp.cryptoview.database")
             verifyMigrations.set(true)
+            schemaOutputDirectory.set(file("src/commonMain/sqldelight/databases"))
         }
     }
 }

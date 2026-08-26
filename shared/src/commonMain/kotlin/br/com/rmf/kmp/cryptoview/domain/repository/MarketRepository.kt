@@ -6,6 +6,7 @@ import br.com.rmf.kmp.cryptoview.data.database.MarketLocalDataSource
 import br.com.rmf.kmp.cryptoview.domain.model.ApiResult
 import br.com.rmf.kmp.cryptoview.domain.model.CoinExchangeMarket
 import br.com.rmf.kmp.cryptoview.domain.model.CoinHistoryPoint
+import br.com.rmf.kmp.cryptoview.domain.model.CoinHistoryRange
 import br.com.rmf.kmp.cryptoview.domain.model.CoinSummary
 import br.com.rmf.kmp.cryptoview.domain.model.CoinSortOrder
 import br.com.rmf.kmp.cryptoview.domain.model.CoinVariationFilter
@@ -20,7 +21,6 @@ import kotlinx.coroutines.supervisorScope
 data class CoinDetailRefreshResult(
     val quoteError: CryptoError? = null,
     val marketsError: CryptoError? = null,
-    val historyError: CryptoError? = null,
 )
 
 class MarketRepository internal constructor(
@@ -53,7 +53,8 @@ class MarketRepository internal constructor(
     fun observeExchange(id: Long): Flow<ExchangeSummary?> = local.observeExchange(id)
     fun observeAssets(exchangeId: Long): Flow<List<ExchangeAsset>> = local.observeAssets(exchangeId)
     fun observeMarkets(coinId: Long): Flow<List<CoinExchangeMarket>> = local.observeMarkets(coinId)
-    fun observeHistory(coinId: Long): Flow<List<CoinHistoryPoint>> = local.observeHistory(coinId)
+    fun observeHistory(coinId: Long, range: CoinHistoryRange): Flow<List<CoinHistoryPoint>> =
+        local.observeHistory(coinId, range)
     fun coinDescription(id: Long): Pair<String?, String?> = local.coinDescription(id)
 
     fun coinCount(): Long = local.countCoins()
@@ -77,11 +78,9 @@ class MarketRepository internal constructor(
     suspend fun refreshCoinDetails(coinId: Long): CoinDetailRefreshResult = supervisorScope {
         val quote = async { refreshQuote(coinId) }
         val markets = async { refreshMarkets(coinId) }
-        val history = async { refreshHistory(coinId) }
         CoinDetailRefreshResult(
             quoteError = quote.await(),
             marketsError = markets.await(),
-            historyError = history.await(),
         )
     }
 
@@ -114,12 +113,16 @@ class MarketRepository internal constructor(
         }
     }
 
-    suspend fun refreshHistory(coinId: Long, force: Boolean = false): CryptoError? {
-        val key = "coin_history:$coinId"
+    suspend fun refreshHistory(
+        coinId: Long,
+        range: CoinHistoryRange,
+        force: Boolean = false,
+    ): CryptoError? {
+        val key = local.historyResourceKey(coinId, range)
         if (!force && local.isFresh(key, HISTORY_CACHE_TTL_MILLIS)) return null
-        return when (val result = remote.coinHistory(coinId).first()) {
+        return when (val result = remote.coinHistory(coinId, range).first()) {
             is ApiResult.Success -> {
-                local.replaceHistory(coinId, result.data)
+                local.replaceHistory(coinId, range, result.data)
                 null
             }
             is ApiResult.Failure -> {

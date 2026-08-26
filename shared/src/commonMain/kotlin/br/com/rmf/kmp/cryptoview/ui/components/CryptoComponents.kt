@@ -48,6 +48,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.sp
 import br.com.rmf.kmp.cryptoview.domain.model.SyncProgress
+import br.com.rmf.kmp.cryptoview.domain.model.CoinHistoryPoint
+import br.com.rmf.kmp.cryptoview.domain.model.CoinHistoryRange
 import br.com.rmf.kmp.cryptoview.domain.model.SyncPhase
 import br.com.rmf.kmp.cryptoview.domain.model.SyncStatus
 import br.com.rmf.kmp.cryptoview.ui.theme.CryptoBorder
@@ -327,15 +329,17 @@ fun OutlinedCard(
 
 @Composable
 fun SparklineChart(
-    values: List<Float>,
+    points: List<CoinHistoryPoint>,
+    range: CoinHistoryRange,
     modifier: Modifier = Modifier,
 ) {
+    val values = points.map { it.priceUsd.toFloat() }
     val trend = if (values.lastOrNull().let { last -> last != null && last >= (values.firstOrNull() ?: last) }) "alta" else "baixa"
     Canvas(
         modifier = modifier
             .fillMaxWidth()
             .height(132.dp)
-            .semantics { contentDescription = "Gráfico das últimas 24 horas com tendência de $trend" },
+            .semantics { contentDescription = "Gráfico de preço do período ${range.label} com tendência de $trend" },
     ) {
         if (values.size < 2) return@Canvas
         val horizontalPadding = 2.dp.toPx()

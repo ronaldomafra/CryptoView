@@ -1,0 +1,19 @@
+CREATE TABLE coin_history_point_new (
+    coinId INTEGER NOT NULL REFERENCES coin(id) ON DELETE CASCADE,
+    rangeKey TEXT NOT NULL,
+    timestamp TEXT NOT NULL,
+    priceUsd REAL NOT NULL,
+    fetchedAt INTEGER NOT NULL,
+    PRIMARY KEY(coinId, rangeKey, timestamp)
+);
+
+INSERT INTO coin_history_point_new(coinId, rangeKey, timestamp, priceUsd, fetchedAt)
+SELECT coinId, 'HOURS_24', timestamp, priceUsd, fetchedAt
+FROM coin_history_point;
+
+DROP TABLE coin_history_point;
+
+ALTER TABLE coin_history_point_new RENAME TO coin_history_point;
+
+CREATE INDEX coin_history_coin_range_index
+ON coin_history_point(coinId, rangeKey, timestamp);

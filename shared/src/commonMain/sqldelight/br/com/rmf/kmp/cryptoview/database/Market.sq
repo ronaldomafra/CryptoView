@@ -99,13 +99,14 @@ CREATE INDEX coin_market_exchange_index ON coin_exchange_market(exchangeId);
 
 CREATE TABLE coin_history_point (
     coinId INTEGER NOT NULL REFERENCES coin(id) ON DELETE CASCADE,
+    rangeKey TEXT NOT NULL,
     timestamp TEXT NOT NULL,
     priceUsd REAL NOT NULL,
     fetchedAt INTEGER NOT NULL,
-    PRIMARY KEY(coinId, timestamp)
+    PRIMARY KEY(coinId, rangeKey, timestamp)
 );
 
-CREATE INDEX coin_history_coin_index ON coin_history_point(coinId, timestamp);
+CREATE INDEX coin_history_coin_range_index ON coin_history_point(coinId, rangeKey, timestamp);
 
 CREATE TABLE resource_cache_state (
     resourceKey TEXT NOT NULL PRIMARY KEY,
@@ -390,14 +391,14 @@ WHERE cm.coinId = ?
 ORDER BY cm.volume24hUsd DESC;
 
 replaceHistoryPoint:
-INSERT OR REPLACE INTO coin_history_point(coinId, timestamp, priceUsd, fetchedAt)
-VALUES (?, ?, ?, ?);
+INSERT OR REPLACE INTO coin_history_point(coinId, rangeKey, timestamp, priceUsd, fetchedAt)
+VALUES (?, ?, ?, ?, ?);
 
 deleteCoinHistory:
-DELETE FROM coin_history_point WHERE coinId = ?;
+DELETE FROM coin_history_point WHERE coinId = ? AND rangeKey = ?;
 
 selectCoinHistory:
-SELECT * FROM coin_history_point WHERE coinId = ? ORDER BY timestamp ASC;
+SELECT * FROM coin_history_point WHERE coinId = ? AND rangeKey = ? ORDER BY timestamp ASC;
 
 upsertResourceState:
 INSERT OR REPLACE INTO resource_cache_state(

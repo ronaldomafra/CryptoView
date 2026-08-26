@@ -277,7 +277,7 @@ Sugestões iniciais de cache:
 - Exchanges/listagem: 5 minutos.
 - Metadados: 24 horas.
 - Market pairs: 5 minutos.
-- Histórico: 15 minutos.
+- Histórico: cache separado por moeda/período; emitir o valor salvo imediatamente e revalidar diretamente na API ao expandir a moeda ou selecionar outro período.
 
 ## 9. API key e segurança
 
@@ -352,6 +352,8 @@ Endpoints principais validados na documentação em 24/08/2026:
 | Histórico da exchange | `/v1/exchange/quotes/historical` |
 
 Não utilizar endpoints de criptomoedas marcados como legados quando existir a versão atual acima.
+
+Para o gráfico de linha, usar os limites do plano Basic com no máximo 100 pontos por consulta: `24H` (`1h × 24`), `7D` (`2h × 84`), `30D` (`12h × 60`) e `1A` (`7d × 52`). O plano gratuito suporta até 1 mês intradiário e 1 ano em intervalos diários. Cada troca de período cancela somente a consulta histórica anterior; histórico não participa da sincronização global nem do polling da cotação atual.
 
 ### Restrições de plano
 

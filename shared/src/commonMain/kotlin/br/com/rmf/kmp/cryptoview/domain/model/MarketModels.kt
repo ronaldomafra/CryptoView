@@ -12,6 +12,23 @@ enum class CoinVariationFilter {
     NEGATIVE,
 }
 
+enum class CoinHistoryRange(
+    val label: String,
+    val interval: String,
+    val count: Int,
+    val metricSuffix: String,
+) {
+    HOURS_24("24H", "1h", 24, "24h"),
+    DAYS_7("7D", "2h", 84, "7d"),
+    DAYS_30("30D", "12h", 60, "30d"),
+    YEAR_1("1A", "7d", 52, "1a"),
+    ;
+
+    init {
+        require(count in 1..100) { "O histórico deve consumir no máximo um crédito por consulta" }
+    }
+}
+
 data class CoinSummary(
     val id: Long,
     val name: String,

@@ -48,6 +48,7 @@ Refatoração posterior simplificou a implementação para um único coordenador
 - Não foi criado módulo iOS adicional nem adotado CocoaPods.
 - A arquitetura do projeto de referência foi usada como inspiração, não copiada integralmente.
 - Histórico não participa da sincronização global.
+- Histórico é consultado sob demanda por moeda/período (`24H`, `7D`, `30D`, `1A`), com até 100 pontos por chamada e cache independente.
 - Relações moeda–corretora são carregadas por demanda porque o endpoint é por moeda e pode depender do plano.
 - A chave de desenvolvimento nunca deve ser salva em código, documentação, fixture, comando ou log.
 

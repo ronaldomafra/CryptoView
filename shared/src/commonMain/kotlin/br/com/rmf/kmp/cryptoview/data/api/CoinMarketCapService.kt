@@ -2,7 +2,6 @@ package br.com.rmf.kmp.cryptoview.data.api
 
 import br.com.rmf.kmp.cryptoview.domain.model.api.ApiEnvelope
 import br.com.rmf.kmp.cryptoview.domain.model.api.KeyInfoDto
-import br.com.rmf.kmp.cryptoview.domain.model.api.CoinHistoryDto
 import br.com.rmf.kmp.cryptoview.domain.model.api.CoinListingDto
 import br.com.rmf.kmp.cryptoview.domain.model.api.CoinMarketPairsDto
 import br.com.rmf.kmp.cryptoview.domain.model.api.CoinMetadataDto
@@ -15,6 +14,7 @@ import de.jensklingenberg.ktorfit.http.GET
 import de.jensklingenberg.ktorfit.http.Header
 import de.jensklingenberg.ktorfit.http.Query
 import kotlinx.coroutines.flow.Flow
+import kotlinx.serialization.json.JsonElement
 
 internal interface CoinMarketCapService {
     @GET("v1/key/info")
@@ -56,9 +56,9 @@ internal interface CoinMarketCapService {
         @Header("X-CMC_PRO_API_KEY") apiKey: String,
         @Query("id") id: Long,
         @Query("convert") convert: String = "USD",
-        @Query("interval") interval: String = "1h",
-        @Query("count") count: Int = 24,
-    ): Flow<Response<ApiEnvelope<CoinHistoryDto>>>
+        @Query("interval") interval: String,
+        @Query("count") count: Int,
+    ): Flow<Response<ApiEnvelope<JsonElement>>>
 
     @GET("v2/cryptocurrency/market-pairs/latest")
     fun getCoinMarketPairs(

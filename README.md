@@ -8,9 +8,9 @@ Aplicativo Kotlin Multiplatform/Compose Multiplatform para consultar moedas e co
 - Android utiliza Keystore + AES-256-GCM; iOS utiliza Swift, CryptoKit e Keychain, sem CocoaPods.
 - SQLDelight é a fonte de verdade para moedas, corretoras, cotações e cache por demanda.
 - Sincronização coordenada com páginas paralelas, rate limit, transações por batch, pool, WAL, checkpoint, cancelamento e retomada.
-- Histórico e mercados são carregados ao abrir uma moeda; ativos são carregados ao abrir uma corretora.
+- Histórico e mercados são carregados ao abrir uma moeda; o gráfico histórico consulta diretamente a API com opções `24H`, `7D`, `30D` e `1A`, mantendo cache independente por período.
 - Polling de 60 segundos ocorre somente para a moeda expandida.
-- Compilação compartilhada Android e 30 testes Android host aprovados.
+- Build Android, migração SQLDelight e 33 testes Android host aprovados.
 - Sincronização apresentada com progresso horizontal por etapas; ao fechar o modal, a execução continua em segundo plano e pode ser reaberta pelo indicador da top bar.
 - Inicialização e sincronização Android validadas em dispositivo real, sem crash nem bloqueio do SQLite; restrições `403` do plano são tratadas sem interromper a sincronização das moedas.
 - Aplicativo iOS validado manualmente em macOS/Xcode em 26/08/2026.
@@ -47,5 +47,6 @@ A UI compartilhada segue esse conjunto visual no onboarding, mercado, busca/filt
 
 - Market pairs, histórico e ativos podem retornar `403` conforme o plano; a UI mantém as demais seções disponíveis.
 - A validação manual do iOS foi aprovada; a automação do build e dos testes em runner macOS ainda está pendente.
+- O novo seletor de histórico ainda requer revalidação visual e funcional no iOS.
 - Benchmarks de paralelismo, pool e batches ainda não foram executados.
 - Estados visuais offline/desatualizado permanecem no próximo recorte.
