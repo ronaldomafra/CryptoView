@@ -46,7 +46,6 @@ import org.koin.core.module.dsl.withOptions
 internal const val COIN_MARKET_CAP_BASE_URL = "https://pro-api.coinmarketcap.com/"
 internal const val COIN_PAPRIKA_BASE_URL = "https://api.coinpaprika.com/v1/"
 private const val COIN_PAPRIKA_KTORFIT = "coinPaprikaKtorfit"
-private const val COIN_PAPRIKA_RATE_LIMITER = "coinPaprikaRateLimiter"
 
 internal val networkModule = module {
     single {
@@ -85,12 +84,10 @@ internal val networkModule = module {
         get<Ktorfit>(named(COIN_PAPRIKA_KTORFIT)).createCoinPaprikaService()
     }
     single { CoinPaprikaRequestExecutor() }
-    single(named(COIN_PAPRIKA_RATE_LIMITER)) { ApiRateLimiter() }
     single {
         CoinPaprikaRemoteDataSource(
             service = get(),
             requestExecutor = get(),
-            rateLimiter = get(named(COIN_PAPRIKA_RATE_LIMITER)),
         )
     }
 }

@@ -48,7 +48,7 @@ Checkpoint atualizado em 26/08/2026. A marcação indica código implementado; v
 - [x] Cliente CoinPaprika público separado, sem API key, com busca antecipada e detalhe sob demanda
 - [x] Mapeamento CoinMarketCap/CoinPaprika estrito, persistido e fora da sincronização global
 - [x] Cache de informações CoinPaprika por 24 horas com invalidação do ID em `404`
-- [x] Detalhes da tela `Informações` independentes do rate limiter; busca do `coin_id` continua limitada
+- [x] Busca do `coin_id` e detalhes da tela `Informações` independentes de rate limiter local
 - [x] SQLDelight como fonte de verdade local
 - [x] Índices, WAL, `busy_timeout` e pool controlado por `Semaphore`/`Mutex`
 - [x] Upsert seguro de entidades-pai e `INSERT OR REPLACE` para snapshots
@@ -70,11 +70,11 @@ Checkpoint atualizado em 26/08/2026. A marcação indica código implementado; v
 - [x] Testes de armazenamento seguro e consulta de chave
 - [x] Testes de parsing das duas formas de cotação USD
 - [x] Testes de reserva de cota e percentual de progresso
-- [x] Teste Android host: 46 testes aprovados em 26/08/2026
+- [x] Teste Android host: 45 testes aprovados em 26/08/2026
 - [x] Teste do observador paginado progressivo após commits sucessivos do banco
 - [x] Testes do paralelismo de metadata e do burst controlado pelo rate limiter
 - [x] Teste confirma que somente o histórico ignora o rate limiter local
-- [x] Teste confirma que o detalhe CoinPaprika ignora o limiter e a busca continua limitada
+- [x] Testes CoinPaprika confirmam busca e detalhe diretos, sem autenticação
 - [x] Testes de filtragem CoinPaprika, ausência de autenticação, rota de detalhe única e tratamento de `404`
 - [x] Verificação da migração SQLDelight aprovada
 - [x] Compilação `:shared:compileAndroidMain` aprovada

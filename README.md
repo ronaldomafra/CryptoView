@@ -9,9 +9,9 @@ Aplicativo Kotlin Multiplatform/Compose Multiplatform para consultar moedas e co
 - SQLDelight é a fonte de verdade para moedas, corretoras, cotações e cache por demanda.
 - Sincronização coordenada com páginas paralelas, rate limit, transações por batch, pool, WAL, checkpoint, cancelamento e retomada.
 - Histórico e mercados são carregados ao abrir uma moeda; o gráfico histórico consulta diretamente a API com opções `24H`, `7D`, `30D` e `1A`, mantém cache independente por período e não aguarda o rate limiter da sincronização.
-- Ao expandir uma moeda, o app resolve em paralelo e com correspondência estrita o ID público da CoinPaprika; `Informações` só é habilitado quando o ID está disponível e abre uma tela de dados descritivos sob demanda, sem aguardar o rate limiter.
+- Ao expandir uma moeda, o app resolve em paralelo e com correspondência estrita o ID público da CoinPaprika; tanto a busca do ID quanto a tela `Informações` são executadas diretamente, sem rate limiter local.
 - Polling de 60 segundos ocorre somente para a moeda expandida.
-- Build Android, migração SQLDelight e 46 testes Android host aprovados.
+- Build Android, migração SQLDelight e 45 testes Android host aprovados.
 - Sincronização apresentada com progresso horizontal por etapas; no startup o modal permanece fechado e abre somente por ação do usuário. A execução continua em segundo plano e pode ser acompanhada pelo indicador da top bar.
 - Inicialização e sincronização Android validadas em dispositivo real, sem crash nem bloqueio do SQLite; restrições `403` do plano são tratadas sem interromper a sincronização das moedas.
 - Aplicativo iOS validado manualmente em macOS/Xcode em 26/08/2026.
