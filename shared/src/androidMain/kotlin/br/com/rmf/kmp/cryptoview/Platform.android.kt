@@ -31,7 +31,7 @@ actual val platformModule = module {
     single {
         defaultCryptoProcessConfig(
             parallelIoValue = 40,
-            parallelDbValue = 2,
+            parallelDbValue = 1,
         )
     }
     single<HttpClient> { setPlatformHttpClient() } withOptions {
@@ -40,3 +40,7 @@ actual val platformModule = module {
 }
 
 actual fun currentTimeMillis(): Long = System.currentTimeMillis()
+
+internal actual fun logSyncPerformance(message: String) {
+    Log.d("CryptoViewSync", message)
+}

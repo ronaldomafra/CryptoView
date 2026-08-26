@@ -8,11 +8,13 @@ import br.com.rmf.kmp.cryptoview.domain.model.ApiResult
 import br.com.rmf.kmp.cryptoview.domain.model.CryptoError
 import br.com.rmf.kmp.cryptoview.domain.model.SyncPhase
 import br.com.rmf.kmp.cryptoview.domain.model.SyncProgress
+import br.com.rmf.kmp.cryptoview.domain.model.SyncResumeData
 import br.com.rmf.kmp.cryptoview.domain.model.SyncStatus
 import br.com.rmf.kmp.cryptoview.domain.model.SyncTrigger
 import br.com.rmf.kmp.cryptoview.security.SecureApiKeyStatus
 import br.com.rmf.kmp.cryptoview.security.SecureApiKeyStorage
 import br.com.rmf.kmp.cryptoview.utils.CryptoProcessConfig
+import br.com.rmf.kmp.cryptoview.utils.SyncPerformanceTracker
 import br.com.rmf.kmp.cryptoview.utils.mapParallel
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.NonCancellable
@@ -35,12 +37,14 @@ internal class DefaultCryptoSyncCoordinator(
     private val remote: CoinMarketCapRemoteDataSource,
     private val local: MarketLocalDataSource,
     private val config: CryptoProcessConfig,
+    private val performanceTracker: SyncPerformanceTracker = SyncPerformanceTracker(),
 ) : CryptoSyncCoordinator {
 
     override suspend fun execute(
         trigger: SyncTrigger,
         onProgress: (SyncProgress) -> Unit,
     ) {
+        performanceTracker.reset()
         var latestProgress = SyncProgress()
         val report: (SyncProgress) -> Unit = { progress ->
             latestProgress = progress
@@ -120,10 +124,16 @@ internal class DefaultCryptoSyncCoordinator(
                 report = report,
             )
 
-            syncExchanges(session)
-            syncExchangeMetadata(session)
-            syncCoins(session)
-            syncCoinMetadata(session)
+            syncExecutionPhases(resumable).forEach { phase ->
+                trackPhase(phase) {
+                    when (phase) {
+                        SyncPhase.EXCHANGES -> syncExchanges(session)
+                        SyncPhase.EXCHANGE_METADATA -> syncExchangeMetadata(session)
+                        SyncPhase.COINS -> syncCoins(session)
+                        else -> error("Fase não suportada no plano de sincronização: $phase")
+                    }
+                }
+            }
             session.complete()
         } catch (exception: CancellationException) {
             withContext(NonCancellable) {
@@ -155,6 +165,20 @@ internal class DefaultCryptoSyncCoordinator(
                 ),
                 report,
             )
+        } finally {
+            performanceTracker.flush()
+        }
+    }
+
+    private suspend fun trackPhase(
+        phase: SyncPhase,
+        block: suspend () -> Unit,
+    ) {
+        val startedAt = performanceTracker.mark()
+        try {
+            block()
+        } finally {
+            performanceTracker.recordElapsed("phase.${phase.name.lowercase()}", startedAt)
         }
     }
 
@@ -306,29 +330,6 @@ internal class DefaultCryptoSyncCoordinator(
             session.skip(phase, "Catálogo de moedas limitado pelo plano atual", restricted = true)
         }
         session.discoverTarget(phase, local.countCoins())
-    }
-
-    private suspend fun syncCoinMetadata(session: RunSession) {
-        val phase = SyncPhase.COIN_METADATA
-        if (session.quota.isInReserve(QUOTA_RESERVE_PERCENT)) {
-            session.skip(phase, "Metadados adiados para preservar a cota", restricted = true)
-            return
-        }
-        if (session.trigger == SyncTrigger.STARTUP_ESSENTIAL && local.countCoins() > 0) {
-            session.skip(phase, "Metadados completos são atualizados manualmente")
-            return
-        }
-
-        session.startPhase(phase, "Atualizando moedas")
-        processMetadataPhase(
-            session = session,
-            phase = phase,
-            selectPendingIds = { minimumFetchedAt, limit, offset ->
-                local.coinIdsMissingMetadata(minimumFetchedAt, limit, offset)
-            },
-            download = remote::coinMetadata,
-            persist = { page, items -> local.persistCoinMetadata(session.runId, page, items) },
-        )
     }
 
     private suspend fun <T> processMetadataPhase(
@@ -544,3 +545,10 @@ internal class DefaultCryptoSyncCoordinator(
 }
 
 private class SyncFailure(val error: CryptoError) : RuntimeException()
+
+internal fun syncExecutionPhases(resumable: SyncResumeData?): List<SyncPhase> =
+    if (resumable?.phase == SyncPhase.COIN_METADATA) {
+        emptyList()
+    } else {
+        listOf(SyncPhase.EXCHANGES, SyncPhase.EXCHANGE_METADATA, SyncPhase.COINS)
+    }

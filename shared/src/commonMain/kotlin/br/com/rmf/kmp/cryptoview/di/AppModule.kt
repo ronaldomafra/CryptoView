@@ -1,5 +1,6 @@
 package br.com.rmf.kmp.cryptoview.di
 
+import br.com.rmf.kmp.cryptoview.logSyncPerformance
 import br.com.rmf.kmp.cryptoview.data.api.CoinMarketCapRequestExecutor
 import br.com.rmf.kmp.cryptoview.data.api.CoinMarketCapService
 import br.com.rmf.kmp.cryptoview.data.api.ApiRateLimiter
@@ -33,6 +34,7 @@ import br.com.rmf.kmp.cryptoview.ui.viewmodel.MarketViewModel
 import br.com.rmf.kmp.cryptoview.ui.viewmodel.CoinMarketsViewModel
 import br.com.rmf.kmp.cryptoview.ui.viewmodel.CoinInformationViewModel
 import br.com.rmf.kmp.cryptoview.ui.viewmodel.SettingsViewModel
+import br.com.rmf.kmp.cryptoview.utils.SyncPerformanceTracker
 import de.jensklingenberg.ktorfit.Ktorfit
 import de.jensklingenberg.ktorfit.converter.FlowConverterFactory
 import de.jensklingenberg.ktorfit.converter.ResponseConverterFactory
@@ -48,6 +50,7 @@ internal const val COIN_PAPRIKA_BASE_URL = "https://api.coinpaprika.com/v1/"
 private const val COIN_PAPRIKA_KTORFIT = "coinPaprikaKtorfit"
 
 internal val networkModule = module {
+    single { SyncPerformanceTracker(sink = ::logSyncPerformance) }
     single {
         Ktorfit.Builder()
             .baseUrl(COIN_MARKET_CAP_BASE_URL)
@@ -68,6 +71,7 @@ internal val networkModule = module {
             requestExecutor = get(),
             authenticatedExecutor = get(),
             rateLimiter = get(),
+            performanceTracker = get(),
         )
     }
     single(named(COIN_PAPRIKA_KTORFIT)) {
@@ -100,7 +104,7 @@ internal val databaseModule = module {
     }
     single { CryptoDatabase(get()) }
     single { CryptoDatabasePool(get(), get()) }
-    single { MarketLocalDataSource(get(), get()) }
+    single { MarketLocalDataSource(get(), get(), get()) }
 }
 
 internal val repositoryModule = module {
@@ -120,6 +124,7 @@ internal val syncModule = module {
             remote = get(),
             local = get(),
             config = get(),
+            performanceTracker = get(),
         )
     }
     single<CryptoSyncManager> { DefaultCryptoSyncManager(coordinator = get()) }

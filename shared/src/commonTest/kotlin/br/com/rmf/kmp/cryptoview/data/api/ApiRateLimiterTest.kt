@@ -17,10 +17,10 @@ class ApiRateLimiterTest {
             },
         )
 
-        repeat(3) { limiter.acquire(requestsPerMinute = 3) }
+        repeat(3) { assertEquals(0L, limiter.acquire(requestsPerMinute = 3)) }
         assertEquals(emptyList(), waits)
 
-        limiter.acquire(requestsPerMinute = 3)
+        assertEquals(60_000L, limiter.acquire(requestsPerMinute = 3))
         assertEquals(listOf(60_000L), waits)
     }
 }

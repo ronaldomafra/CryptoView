@@ -6,6 +6,7 @@ android-targetSdk = "36"
 androidx-activity = "1.13.0"
 androidx-appcompat = "1.7.1"
 androidx-core = "1.19.0"
+androidx-core-splashscreen = "1.2.0"
 androidx-espresso = "3.7.0"
 androidx-lifecycle = "2.11.0-beta01"
 androidx-datastore = "1.2.1"
@@ -31,6 +32,7 @@ kotlin-test = { module = "org.jetbrains.kotlin:kotlin-test", version.ref = "kotl
 kotlin-testJunit = { module = "org.jetbrains.kotlin:kotlin-test-junit", version.ref = "kotlin" }
 junit = { module = "junit:junit", version.ref = "junit" }
 androidx-core-ktx = { module = "androidx.core:core-ktx", version.ref = "androidx-core" }
+androidx-core-splashscreen = { module = "androidx.core:core-splashscreen", version.ref = "androidx-core-splashscreen" }
 androidx-testExt-junit = { module = "androidx.test.ext:junit", version.ref = "androidx-testExt" }
 androidx-espresso-core = { module = "androidx.test.espresso:espresso-core", version.ref = "androidx-espresso" }
 androidx-appcompat = { module = "androidx.appcompat:appcompat", version.ref = "androidx-appcompat" }
@@ -69,6 +71,7 @@ sqldelight-runtime = { module = "app.cash.sqldelight:runtime", version.ref = "sq
 sqldelight-coroutines = { module = "app.cash.sqldelight:coroutines-extensions", version.ref = "sqldelight" }
 sqldelight-android-driver = { module = "app.cash.sqldelight:android-driver", version.ref = "sqldelight" }
 sqldelight-native-driver = { module = "app.cash.sqldelight:native-driver", version.ref = "sqldelight" }
+sqldelight-sqlite-driver = { module = "app.cash.sqldelight:sqlite-driver", version.ref = "sqldelight" }
 coil-compose = { module = "io.coil-kt.coil3:coil-compose", version.ref = "coil" }
 coil-network-ktor3 = { module = "io.coil-kt.coil3:coil-network-ktor3", version.ref = "coil" }
 androidx-sqlite-framework = { module = "androidx.sqlite:sqlite-framework", version.ref = "androidx-sqlite" }

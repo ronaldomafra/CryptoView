@@ -14,3 +14,5 @@ expect fun setPlatformHttpClient(): HttpClient
 expect val platformModule: Module
 
 expect fun currentTimeMillis(): Long
+
+internal expect fun logSyncPerformance(message: String)

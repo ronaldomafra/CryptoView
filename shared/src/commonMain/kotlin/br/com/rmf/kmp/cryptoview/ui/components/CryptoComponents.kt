@@ -424,8 +424,8 @@ fun SyncProgressContent(
             style = MaterialTheme.typography.bodyMedium,
         )
         Spacer(Modifier.height(18.dp))
-        Text("Salvando dados no dispositivo", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
-        Text("Você pode continuar usando o app.", color = MaterialTheme.colorScheme.onSurfaceVariant, textAlign = TextAlign.Center)
+        Text("Atualização em andamento", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+        Text("Os dados ficam disponíveis conforme são atualizados.", color = MaterialTheme.colorScheme.onSurfaceVariant, textAlign = TextAlign.Center)
         Spacer(Modifier.height(22.dp))
         PrimaryActionButton(
             if (progress.status == SyncStatus.RUNNING) "Executar em segundo plano" else "Fechar",

@@ -35,10 +35,14 @@ actual val platformModule = module {
     single {
         defaultCryptoProcessConfig(
             parallelIoValue = 20,
-            parallelDbValue = 2,
+            parallelDbValue = 1,
         )
     }
     single<HttpClient> { setPlatformHttpClient() } withOptions {
         onClose { client -> client?.close() }
     }
+}
+
+internal actual fun logSyncPerformance(message: String) {
+    NSLog("CryptoViewSync: %@", message)
 }

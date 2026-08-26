@@ -27,6 +27,7 @@ import br.com.rmf.kmp.cryptoview.domain.model.api.ExchangeMetadataDto
 import br.com.rmf.kmp.cryptoview.data.api.doubleValue
 import br.com.rmf.kmp.cryptoview.data.api.stringValue
 import br.com.rmf.kmp.cryptoview.data.api.usdQuote
+import br.com.rmf.kmp.cryptoview.utils.SyncPerformanceTracker
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flowOn
@@ -35,6 +36,7 @@ import kotlinx.coroutines.flow.map
 internal class MarketLocalDataSource(
     private val database: CryptoDatabase,
     private val pool: CryptoDatabasePool,
+    private val performanceTracker: SyncPerformanceTracker = SyncPerformanceTracker(),
 ) {
     fun observeCoins(
         query: String,
@@ -45,7 +47,12 @@ internal class MarketLocalDataSource(
         offset: Long,
     ): Flow<List<CoinSummary>> {
         val normalized = query.trim().lowercase()
-        return pool.changeVersion.map {
+        return pool.observeChanges(
+            DatabaseChange.COINS,
+            DatabaseChange.COIN_QUOTES,
+            DatabaseChange.COIN_METADATA,
+            DatabaseChange.COIN_MARKETS,
+        ).map {
             database.marketQueries.selectCoins(
                 query = normalized,
                 queryLike = "%$normalized%",
@@ -57,7 +64,8 @@ internal class MarketLocalDataSource(
                 mapper = { id, name, symbol, slug, rank, numMarketPairs, price, volume24h,
                     percentChange24h, marketCap, quoteUpdatedAt, quoteFetchedAt, logoUrl ->
                     CoinSummary(id, name, symbol, slug, rank, numMarketPairs, price, volume24h,
-                        percentChange24h, marketCap, quoteUpdatedAt, quoteFetchedAt, logoUrl)
+                        percentChange24h, marketCap, quoteUpdatedAt, quoteFetchedAt,
+                        resolveCoinLogoUrl(id, logoUrl))
                 },
             ).executeAsList()
         }.flowOn(Dispatchers.Default)
@@ -65,7 +73,10 @@ internal class MarketLocalDataSource(
 
     fun observeExchanges(query: String, limit: Long, offset: Long): Flow<List<ExchangeSummary>> {
         val normalized = query.trim().lowercase()
-        return pool.changeVersion.map {
+        return pool.observeChanges(
+            DatabaseChange.EXCHANGES,
+            DatabaseChange.EXCHANGE_METADATA,
+        ).map {
             database.marketQueries.selectExchanges(
                 query = normalized,
                 queryLike = "%$normalized%",
@@ -76,45 +87,67 @@ internal class MarketLocalDataSource(
         }.flowOn(Dispatchers.Default)
     }
 
-    fun observeCachedMarketExchanges(limit: Long): Flow<List<ExchangeSummary>> = pool.changeVersion.map {
+    fun observeCachedMarketExchanges(limit: Long): Flow<List<ExchangeSummary>> = pool.observeChanges(
+        DatabaseChange.EXCHANGES,
+        DatabaseChange.EXCHANGE_METADATA,
+        DatabaseChange.COIN_MARKETS,
+    ).map {
         database.marketQueries.selectCachedMarketExchanges(limit, mapper = ::mapExchange).executeAsList()
     }.flowOn(Dispatchers.Default)
 
-    fun observeCoin(id: Long): Flow<CoinSummary?> = pool.changeVersion.map {
+    fun observeCoin(id: Long): Flow<CoinSummary?> = pool.observeChanges(
+        DatabaseChange.COINS,
+        DatabaseChange.COIN_QUOTES,
+        DatabaseChange.COIN_METADATA,
+    ).map {
         database.marketQueries.selectCoinById(
             id,
             mapper = { coinId, name, symbol, slug, rank, numMarketPairs, price, volume24h,
                 percentChange24h, marketCap, quoteUpdatedAt, quoteFetchedAt, logoUrl, _, _ ->
                 CoinSummary(coinId, name, symbol, slug, rank, numMarketPairs, price, volume24h,
-                    percentChange24h, marketCap, quoteUpdatedAt, quoteFetchedAt, logoUrl)
+                    percentChange24h, marketCap, quoteUpdatedAt, quoteFetchedAt,
+                    resolveCoinLogoUrl(coinId, logoUrl))
             },
         ).executeAsOneOrNull()
     }.flowOn(Dispatchers.Default)
 
-    fun observeExchange(id: Long): Flow<ExchangeSummary?> = pool.changeVersion.map {
+    fun observeExchange(id: Long): Flow<ExchangeSummary?> = pool.observeChanges(
+        DatabaseChange.EXCHANGES,
+        DatabaseChange.EXCHANGE_METADATA,
+    ).map {
         database.marketQueries.selectExchangeById(id, mapper = ::mapExchange).executeAsOneOrNull()
     }.flowOn(Dispatchers.Default)
 
-    fun observeAssets(exchangeId: Long): Flow<List<ExchangeAsset>> = pool.changeVersion.map {
+    fun observeAssets(exchangeId: Long): Flow<List<ExchangeAsset>> = pool.observeChanges(
+        DatabaseChange.EXCHANGE_ASSETS,
+    ).map {
         database.marketQueries.selectExchangeAssets(exchangeId) { id, currencyId, name, symbol, price, balance, value, _ ->
             ExchangeAsset(id, currencyId, name, symbol, price, balance, value)
         }.executeAsList()
     }.flowOn(Dispatchers.Default)
 
-    fun observeMarkets(coinId: Long): Flow<List<CoinExchangeMarket>> = pool.changeVersion.map {
+    fun observeMarkets(coinId: Long): Flow<List<CoinExchangeMarket>> = pool.observeChanges(
+        DatabaseChange.COIN_MARKETS,
+        DatabaseChange.EXCHANGES,
+        DatabaseChange.EXCHANGE_METADATA,
+    ).map {
         database.marketQueries.selectCoinMarkets(coinId) { id, exchangeId, exchangeName, logo, pair, category,
                 price, volume, updated ->
             CoinExchangeMarket(id, exchangeId, exchangeName, logo, pair, category, price, volume, updated)
         }.executeAsList()
     }.flowOn(Dispatchers.Default)
 
-    fun observeHistory(coinId: Long, range: CoinHistoryRange): Flow<List<CoinHistoryPoint>> = pool.changeVersion.map {
+    fun observeHistory(coinId: Long, range: CoinHistoryRange): Flow<List<CoinHistoryPoint>> = pool.observeChanges(
+        DatabaseChange.COIN_HISTORY,
+    ).map {
         database.marketQueries.selectCoinHistory(coinId, range.name) { _, _, timestamp, price, _ ->
             CoinHistoryPoint(timestamp, price)
         }.executeAsList()
     }.flowOn(Dispatchers.Default)
 
-    fun observeCoinPaprikaMapping(coinId: Long): Flow<CoinPaprikaMapping?> = pool.changeVersion.map {
+    fun observeCoinPaprikaMapping(coinId: Long): Flow<CoinPaprikaMapping?> = pool.observeChanges(
+        DatabaseChange.PAPRIKA_MAPPING,
+    ).map {
         coinPaprikaMapping(coinId)
     }.flowOn(Dispatchers.Default)
 
@@ -124,7 +157,9 @@ internal class MarketLocalDataSource(
         }
         .executeAsOneOrNull()
 
-    fun observeCoinInformation(coinId: Long): Flow<CoinInformation?> = pool.changeVersion.map {
+    fun observeCoinInformation(coinId: Long): Flow<CoinInformation?> = pool.observeChanges(
+        DatabaseChange.PAPRIKA_INFO,
+    ).map {
         coinInformation(coinId)
     }.flowOn(Dispatchers.Default)
 
@@ -153,40 +188,12 @@ internal class MarketLocalDataSource(
         items: List<CoinListingDto>,
     ) = pool.withConnection { connection ->
         val now = currentTimeMillis()
+        val transactionStartedAt = performanceTracker.mark()
         connection.database.transaction {
             items.forEach { dto ->
-                connection.database.marketQueries.insertCoinIfMissing(
-                    id = dto.id,
-                    name = dto.name.orEmpty().ifBlank { "#${dto.id}" },
-                    normalizedName = dto.name.orEmpty().lowercase(),
-                    symbol = dto.symbol.orEmpty(),
-                    slug = dto.slug.orEmpty(),
-                    rank = dto.rank,
-                    numMarketPairs = dto.numMarketPairs,
-                    circulatingSupply = dto.circulatingSupply,
-                    totalSupply = dto.totalSupply,
-                    maxSupply = dto.maxSupply,
-                    dateAdded = dto.dateAdded,
-                    remoteUpdatedAt = dto.lastUpdated,
-                    lastSeenRunId = runId,
-                )
-                connection.database.marketQueries.updateCoin(
-                    name = dto.name.orEmpty().ifBlank { "#${dto.id}" },
-                    normalizedName = dto.name.orEmpty().lowercase(),
-                    symbol = dto.symbol.orEmpty(),
-                    slug = dto.slug.orEmpty(),
-                    rank = dto.rank,
-                    numMarketPairs = dto.numMarketPairs,
-                    circulatingSupply = dto.circulatingSupply,
-                    totalSupply = dto.totalSupply,
-                    maxSupply = dto.maxSupply,
-                    dateAdded = dto.dateAdded,
-                    remoteUpdatedAt = dto.lastUpdated,
-                    lastSeenRunId = runId,
-                    id = dto.id,
-                )
+                connection.upsertCoin(dto, runId)
                 val usd = dto.quote.usdQuote()
-                connection.database.marketQueries.replaceCoinQuote(
+                connection.upsertCoinQuote(
                     coinId = dto.id,
                     price = usd.doubleValue("price"),
                     volume24h = usd.doubleValue("volume_24h"),
@@ -200,7 +207,12 @@ internal class MarketLocalDataSource(
                 runId, SyncPhase.COINS.name, page.toLong(), "COMMITTED", items.size.toLong(), now,
             )
         }
-        pool.onBatchCommitted(connection.driver)
+        performanceTracker.recordElapsed("database.coins", transactionStartedAt, items.size)
+        pool.onBatchCommitted(
+            connection.driver,
+            DatabaseChange.COINS,
+            DatabaseChange.COIN_QUOTES,
+        )
     }
 
     suspend fun persistCoinMetadata(
@@ -209,6 +221,7 @@ internal class MarketLocalDataSource(
         items: Map<String, CoinMetadataDto>,
     ) = pool.withConnection { connection ->
         val now = currentTimeMillis()
+        val transactionStartedAt = performanceTracker.mark()
         connection.database.transaction {
             items.forEach { (key, dto) ->
                 val id = dto.id ?: key.toLongOrNull() ?: return@forEach
@@ -224,7 +237,8 @@ internal class MarketLocalDataSource(
                 runId, SyncPhase.COIN_METADATA.name, page.toLong(), "COMMITTED", items.size.toLong(), now,
             )
         }
-        pool.onBatchCommitted(connection.driver)
+        performanceTracker.recordElapsed("database.coin_metadata", transactionStartedAt, items.size)
+        pool.onBatchCommitted(connection.driver, DatabaseChange.COIN_METADATA)
     }
 
     suspend fun persistExchangePage(
@@ -233,41 +247,23 @@ internal class MarketLocalDataSource(
         items: List<ExchangeListingDto>,
     ) = pool.withConnection { connection ->
         val now = currentTimeMillis()
+        val transactionStartedAt = performanceTracker.mark()
         connection.database.transaction {
             items.forEach { dto ->
                 val usd = dto.quote.usdQuote()
-                connection.database.marketQueries.insertExchangeIfMissing(
-                    id = dto.id,
-                    name = dto.name.orEmpty().ifBlank { "#${dto.id}" },
-                    normalizedName = dto.name.orEmpty().lowercase(),
-                    slug = dto.slug.orEmpty(),
-                    rank = dto.rank,
-                    numMarketPairs = dto.numMarketPairs,
+                connection.upsertExchange(
+                    dto = dto,
+                    runId = runId,
                     spotVolumeUsd = usd.doubleValue("spot_volume_usd")
                         ?: usd.doubleValue("volume_24h"),
-                    dateLaunched = dto.dateLaunched,
-                    remoteUpdatedAt = dto.lastUpdated,
-                    lastSeenRunId = runId,
-                )
-                connection.database.marketQueries.updateExchange(
-                    name = dto.name.orEmpty().ifBlank { "#${dto.id}" },
-                    normalizedName = dto.name.orEmpty().lowercase(),
-                    slug = dto.slug.orEmpty(),
-                    rank = dto.rank,
-                    numMarketPairs = dto.numMarketPairs,
-                    spotVolumeUsd = usd.doubleValue("spot_volume_usd")
-                        ?: usd.doubleValue("volume_24h"),
-                    dateLaunched = dto.dateLaunched,
-                    remoteUpdatedAt = dto.lastUpdated,
-                    lastSeenRunId = runId,
-                    id = dto.id,
                 )
             }
             connection.database.marketQueries.replaceCheckpoint(
                 runId, SyncPhase.EXCHANGES.name, page.toLong(), "COMMITTED", items.size.toLong(), now,
             )
         }
-        pool.onBatchCommitted(connection.driver)
+        performanceTracker.recordElapsed("database.exchanges", transactionStartedAt, items.size)
+        pool.onBatchCommitted(connection.driver, DatabaseChange.EXCHANGES)
     }
 
     suspend fun persistExchangeMetadata(
@@ -276,6 +272,7 @@ internal class MarketLocalDataSource(
         items: Map<String, ExchangeMetadataDto>,
     ) = pool.withConnection { connection ->
         val now = currentTimeMillis()
+        val transactionStartedAt = performanceTracker.mark()
         connection.database.transaction {
             items.forEach { (key, dto) ->
                 val id = dto.id ?: key.toLongOrNull() ?: return@forEach
@@ -294,7 +291,8 @@ internal class MarketLocalDataSource(
                 runId, SyncPhase.EXCHANGE_METADATA.name, page.toLong(), "COMMITTED", items.size.toLong(), now,
             )
         }
-        pool.onBatchCommitted(connection.driver)
+        performanceTracker.recordElapsed("database.exchange_metadata", transactionStartedAt, items.size)
+        pool.onBatchCommitted(connection.driver, DatabaseChange.EXCHANGE_METADATA)
     }
 
     suspend fun replaceAssets(exchangeId: Long, items: List<ExchangeAssetDto>) =
@@ -315,7 +313,7 @@ internal class MarketLocalDataSource(
                     "exchange_assets:$exchangeId", now, now, "SUCCESS", null,
                 )
             }
-            pool.onBatchCommitted(connection.driver)
+            pool.onBatchCommitted(connection.driver, DatabaseChange.EXCHANGE_ASSETS)
         }
 
     suspend fun replaceMarkets(coinId: Long, data: CoinMarketPairsDto) =
@@ -334,14 +332,6 @@ internal class MarketLocalDataSource(
                         null, null, null, null, null,
                         "on-demand:$coinId",
                     )
-                    connection.database.marketQueries.updateExchange(
-                        exchange.name.orEmpty().ifBlank { "#$exchangeId" },
-                        exchange.name.orEmpty().lowercase(),
-                        exchange.slug.orEmpty(),
-                        null, null, null, null, null,
-                        "on-demand:$coinId",
-                        exchangeId,
-                    )
                     val usd = dto.quote.usdQuote()
                     connection.database.marketQueries.replaceCoinExchangeMarket(
                         coinId, exchangeId, dto.marketPair.orEmpty(), dto.category,
@@ -353,7 +343,11 @@ internal class MarketLocalDataSource(
                     "coin_markets:$coinId", now, now, "SUCCESS", null,
                 )
             }
-            pool.onBatchCommitted(connection.driver)
+            pool.onBatchCommitted(
+                connection.driver,
+                DatabaseChange.COIN_MARKETS,
+                DatabaseChange.EXCHANGES,
+            )
         }
 
     suspend fun replaceHistory(coinId: Long, range: CoinHistoryRange, data: CoinHistoryDto) =
@@ -370,7 +364,7 @@ internal class MarketLocalDataSource(
                     historyResourceKey(coinId, range), now, now, "SUCCESS", null,
                 )
             }
-            pool.onBatchCommitted(connection.driver)
+            pool.onBatchCommitted(connection.driver, DatabaseChange.COIN_HISTORY)
         }
 
     fun historyResourceKey(coinId: Long, range: CoinHistoryRange): String =
@@ -378,7 +372,7 @@ internal class MarketLocalDataSource(
 
     suspend fun replaceQuote(coinId: Long, dto: CoinListingDto) = pool.withConnection { connection ->
         val usd = dto.quote.usdQuote()
-        connection.database.marketQueries.replaceCoinQuote(
+        connection.upsertCoinQuote(
             coinId,
             usd.doubleValue("price"),
             usd.doubleValue("volume_24h"),
@@ -387,7 +381,7 @@ internal class MarketLocalDataSource(
             usd.stringValue("last_updated") ?: dto.lastUpdated,
             currentTimeMillis(),
         )
-        pool.onBatchCommitted(connection.driver)
+        pool.onBatchCommitted(connection.driver, DatabaseChange.COIN_QUOTES)
     }
 
     suspend fun replaceCoinPaprikaMapping(coinId: Long, paprikaId: String) =
@@ -397,7 +391,7 @@ internal class MarketLocalDataSource(
                 paprikaId = paprikaId,
                 resolvedAt = currentTimeMillis(),
             )
-            pool.onBatchCommitted(connection.driver)
+            pool.onBatchCommitted(connection.driver, DatabaseChange.PAPRIKA_MAPPING)
         }
 
     suspend fun replaceCoinInformation(information: CoinInformation) =
@@ -426,7 +420,7 @@ internal class MarketLocalDataSource(
                 whitepaperUrl = information.whitepaperUrl,
                 fetchedAt = information.fetchedAt,
             )
-            pool.onBatchCommitted(connection.driver)
+            pool.onBatchCommitted(connection.driver, DatabaseChange.PAPRIKA_INFO)
         }
 
     suspend fun invalidateCoinPaprikaMapping(coinId: Long) = pool.withConnection { connection ->
@@ -434,17 +428,21 @@ internal class MarketLocalDataSource(
             connection.database.marketQueries.deleteCoinPaprikaInfo(coinId)
             connection.database.marketQueries.deleteCoinPaprikaMapping(coinId)
         }
-        pool.onBatchCommitted(connection.driver)
+        pool.onBatchCommitted(
+            connection.driver,
+            DatabaseChange.PAPRIKA_MAPPING,
+            DatabaseChange.PAPRIKA_INFO,
+        )
     }
 
     suspend fun markCoinsComplete(runId: String) = pool.withConnection { connection ->
         connection.database.marketQueries.markCoinsInactiveOutsideRun(runId)
-        pool.onBatchCommitted(connection.driver)
+        pool.onBatchCommitted(connection.driver, DatabaseChange.COINS)
     }
 
     suspend fun markExchangesComplete(runId: String) = pool.withConnection { connection ->
         connection.database.marketQueries.markExchangesInactiveOutsideRun(runId)
-        pool.onBatchCommitted(connection.driver)
+        pool.onBatchCommitted(connection.driver, DatabaseChange.EXCHANGES)
     }
 
     fun committedPages(runId: String, phase: SyncPhase): Set<Int> = database.marketQueries
@@ -543,7 +541,7 @@ internal class MarketLocalDataSource(
             connection.database.marketQueries.clearRuns()
             connection.database.marketQueries.clearResourceStates()
         }
-        pool.onBatchCommitted(connection.driver)
+        pool.onBatchCommitted(connection.driver, DatabaseChange.ALL)
     }
 
     private fun mapExchange(
@@ -617,3 +615,200 @@ private fun Boolean.toLong(): Long = if (this) 1L else 0L
 
 private inline fun <reified T : Enum<T>> enumValueOfOrNull(value: String): T? =
     enumValues<T>().firstOrNull { it.name == value }
+
+internal fun coinMarketCapLogoUrl(coinId: Long): String =
+    "https://s2.coinmarketcap.com/static/img/coins/64x64/$coinId.png"
+
+internal fun resolveCoinLogoUrl(coinId: Long, cachedLogoUrl: String?): String =
+    cachedLogoUrl?.takeIf(String::isNotBlank) ?: coinMarketCapLogoUrl(coinId)
+
+private fun CryptoDatabaseConnection.upsertCoin(
+    dto: CoinListingDto,
+    runId: String,
+) {
+    val name = dto.name.orEmpty().ifBlank { "#${dto.id}" }
+    val normalizedName = dto.name.orEmpty().lowercase()
+    if (supportsNativeUpsert) {
+        driver.execute(null, NATIVE_COIN_UPSERT, 13) {
+            bindLong(0, dto.id)
+            bindString(1, name)
+            bindString(2, normalizedName)
+            bindString(3, dto.symbol.orEmpty())
+            bindString(4, dto.slug.orEmpty())
+            bindLong(5, dto.rank)
+            bindLong(6, dto.numMarketPairs)
+            bindDouble(7, dto.circulatingSupply)
+            bindDouble(8, dto.totalSupply)
+            bindDouble(9, dto.maxSupply)
+            bindString(10, dto.dateAdded)
+            bindString(11, dto.lastUpdated)
+            bindString(12, runId)
+        }.value
+        return
+    }
+
+    database.marketQueries.insertCoinIfMissing(
+        id = dto.id,
+        name = name,
+        normalizedName = normalizedName,
+        symbol = dto.symbol.orEmpty(),
+        slug = dto.slug.orEmpty(),
+        rank = dto.rank,
+        numMarketPairs = dto.numMarketPairs,
+        circulatingSupply = dto.circulatingSupply,
+        totalSupply = dto.totalSupply,
+        maxSupply = dto.maxSupply,
+        dateAdded = dto.dateAdded,
+        remoteUpdatedAt = dto.lastUpdated,
+        lastSeenRunId = runId,
+    )
+    database.marketQueries.updateCoin(
+        name = name,
+        normalizedName = normalizedName,
+        symbol = dto.symbol.orEmpty(),
+        slug = dto.slug.orEmpty(),
+        rank = dto.rank,
+        numMarketPairs = dto.numMarketPairs,
+        circulatingSupply = dto.circulatingSupply,
+        totalSupply = dto.totalSupply,
+        maxSupply = dto.maxSupply,
+        dateAdded = dto.dateAdded,
+        remoteUpdatedAt = dto.lastUpdated,
+        lastSeenRunId = runId,
+        id = dto.id,
+    )
+}
+
+private fun CryptoDatabaseConnection.upsertCoinQuote(
+    coinId: Long,
+    price: Double?,
+    volume24h: Double?,
+    percentChange24h: Double?,
+    marketCap: Double?,
+    remoteUpdatedAt: String?,
+    fetchedAt: Long,
+) {
+    if (supportsNativeUpsert) {
+        driver.execute(null, NATIVE_COIN_QUOTE_UPSERT, 7) {
+            bindLong(0, coinId)
+            bindDouble(1, price)
+            bindDouble(2, volume24h)
+            bindDouble(3, percentChange24h)
+            bindDouble(4, marketCap)
+            bindString(5, remoteUpdatedAt)
+            bindLong(6, fetchedAt)
+        }.value
+    } else {
+        database.marketQueries.replaceCoinQuote(
+            coinId,
+            price,
+            volume24h,
+            percentChange24h,
+            marketCap,
+            remoteUpdatedAt,
+            fetchedAt,
+        )
+    }
+}
+
+private fun CryptoDatabaseConnection.upsertExchange(
+    dto: ExchangeListingDto,
+    runId: String,
+    spotVolumeUsd: Double?,
+) {
+    val name = dto.name.orEmpty().ifBlank { "#${dto.id}" }
+    val normalizedName = dto.name.orEmpty().lowercase()
+    if (supportsNativeUpsert) {
+        driver.execute(null, NATIVE_EXCHANGE_UPSERT, 10) {
+            bindLong(0, dto.id)
+            bindString(1, name)
+            bindString(2, normalizedName)
+            bindString(3, dto.slug.orEmpty())
+            bindLong(4, dto.rank)
+            bindLong(5, dto.numMarketPairs)
+            bindDouble(6, spotVolumeUsd)
+            bindString(7, dto.dateLaunched)
+            bindString(8, dto.lastUpdated)
+            bindString(9, runId)
+        }.value
+        return
+    }
+
+    database.marketQueries.insertExchangeIfMissing(
+        id = dto.id,
+        name = name,
+        normalizedName = normalizedName,
+        slug = dto.slug.orEmpty(),
+        rank = dto.rank,
+        numMarketPairs = dto.numMarketPairs,
+        spotVolumeUsd = spotVolumeUsd,
+        dateLaunched = dto.dateLaunched,
+        remoteUpdatedAt = dto.lastUpdated,
+        lastSeenRunId = runId,
+    )
+    database.marketQueries.updateExchange(
+        name = name,
+        normalizedName = normalizedName,
+        slug = dto.slug.orEmpty(),
+        rank = dto.rank,
+        numMarketPairs = dto.numMarketPairs,
+        spotVolumeUsd = spotVolumeUsd,
+        dateLaunched = dto.dateLaunched,
+        remoteUpdatedAt = dto.lastUpdated,
+        lastSeenRunId = runId,
+        id = dto.id,
+    )
+}
+
+private const val NATIVE_COIN_UPSERT = """
+    INSERT INTO coin(
+        id, name, normalizedName, symbol, slug, rank, numMarketPairs,
+        circulatingSupply, totalSupply, maxSupply, dateAdded, remoteUpdatedAt,
+        lastSeenRunId, active
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)
+    ON CONFLICT(id) DO UPDATE SET
+        name = excluded.name,
+        normalizedName = excluded.normalizedName,
+        symbol = excluded.symbol,
+        slug = excluded.slug,
+        rank = excluded.rank,
+        numMarketPairs = excluded.numMarketPairs,
+        circulatingSupply = excluded.circulatingSupply,
+        totalSupply = excluded.totalSupply,
+        maxSupply = excluded.maxSupply,
+        dateAdded = excluded.dateAdded,
+        remoteUpdatedAt = excluded.remoteUpdatedAt,
+        lastSeenRunId = excluded.lastSeenRunId,
+        active = 1
+"""
+
+private const val NATIVE_COIN_QUOTE_UPSERT = """
+    INSERT INTO coin_quote(
+        coinId, price, volume24h, percentChange24h, marketCap, remoteUpdatedAt, fetchedAt
+    ) VALUES (?, ?, ?, ?, ?, ?, ?)
+    ON CONFLICT(coinId) DO UPDATE SET
+        price = excluded.price,
+        volume24h = excluded.volume24h,
+        percentChange24h = excluded.percentChange24h,
+        marketCap = excluded.marketCap,
+        remoteUpdatedAt = excluded.remoteUpdatedAt,
+        fetchedAt = excluded.fetchedAt
+"""
+
+private const val NATIVE_EXCHANGE_UPSERT = """
+    INSERT INTO market_exchange(
+        id, name, normalizedName, slug, rank, numMarketPairs, spotVolumeUsd,
+        dateLaunched, remoteUpdatedAt, lastSeenRunId, active
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)
+    ON CONFLICT(id) DO UPDATE SET
+        name = excluded.name,
+        normalizedName = excluded.normalizedName,
+        slug = excluded.slug,
+        rank = excluded.rank,
+        numMarketPairs = excluded.numMarketPairs,
+        spotVolumeUsd = excluded.spotVolumeUsd,
+        dateLaunched = excluded.dateLaunched,
+        remoteUpdatedAt = excluded.remoteUpdatedAt,
+        lastSeenRunId = excluded.lastSeenRunId,
+        active = 1
+"""

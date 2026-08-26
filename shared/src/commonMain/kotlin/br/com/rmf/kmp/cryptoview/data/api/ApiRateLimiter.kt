@@ -13,8 +13,9 @@ internal class ApiRateLimiter(
     private var windowStartedAt: Long? = null
     private var requestsInWindow = 0
 
-    suspend fun acquire(requestsPerMinute: Int) {
+    suspend fun acquire(requestsPerMinute: Int): Long {
         val safeLimit = requestsPerMinute.coerceAtLeast(1)
+        var totalWaitMillis = 0L
 
         while (true) {
             var waitMillis = 0L
@@ -35,8 +36,10 @@ internal class ApiRateLimiter(
                 }
             }
 
-            if (granted) return
-            wait(waitMillis.coerceAtLeast(1L))
+            if (granted) return totalWaitMillis
+            val safeWaitMillis = waitMillis.coerceAtLeast(1L)
+            totalWaitMillis += safeWaitMillis
+            wait(safeWaitMillis)
         }
     }
 
