@@ -1,6 +1,5 @@
 package br.com.rmf.kmp.cryptoview.data.api
 
-import br.com.rmf.kmp.cryptoview.utils.CryptoProcessConfig
 import io.ktor.client.HttpClientConfig
 import io.ktor.client.plugins.HttpTimeout
 import io.ktor.client.plugins.compression.ContentEncoding
@@ -19,7 +18,6 @@ internal val cryptoNetworkJson = Json {
 }
 
 internal fun HttpClientConfig<*>.configureCryptoHttpClient(
-    config: CryptoProcessConfig,
     networkLogger: Logger,
 ) {
     expectSuccess = false
@@ -31,9 +29,9 @@ internal fun HttpClientConfig<*>.configureCryptoHttpClient(
         gzip()
     }
     install(HttpTimeout) {
-        connectTimeoutMillis = config.connectTimeoutMillis
-        requestTimeoutMillis = config.requestTimeoutMillis
-        socketTimeoutMillis = config.socketTimeoutMillis
+        connectTimeoutMillis = CONNECT_TIMEOUT_MILLIS
+        requestTimeoutMillis = REQUEST_TIMEOUT_MILLIS
+        socketTimeoutMillis = SOCKET_TIMEOUT_MILLIS
     }
     install(Logging) {
         logger = networkLogger
@@ -52,3 +50,6 @@ private fun String.isSensitiveCryptoHeader(): Boolean =
         contains("password", ignoreCase = true)
 
 private const val COIN_MARKET_CAP_API_KEY_HEADER = "X-CMC_PRO_API_KEY"
+private const val CONNECT_TIMEOUT_MILLIS = 10_000L
+private const val REQUEST_TIMEOUT_MILLIS = 30_000L
+private const val SOCKET_TIMEOUT_MILLIS = 30_000L

@@ -36,6 +36,7 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import br.com.rmf.kmp.cryptoview.ui.components.CryptoViewLogo
+import br.com.rmf.kmp.cryptoview.ui.components.CryptoIcon
 import br.com.rmf.kmp.cryptoview.ui.components.OutlinedCard
 import br.com.rmf.kmp.cryptoview.ui.components.PrimaryActionButton
 import br.com.rmf.kmp.cryptoview.ui.theme.CryptoBorder
@@ -76,13 +77,13 @@ fun OnboardingScreen(
                 onCreateKey = { uriHandler.openUri("https://coinmarketcap.com/api/") },
                 modifier = Modifier
                     .align(Alignment.Center)
-                    .widthIn(max = 680.dp)
+                    .widthIn(max = 560.dp)
                     .fillMaxWidth(),
             )
         } else {
             Column(
                 modifier = Modifier
-                    .widthIn(max = 680.dp)
+                    .widthIn(max = 560.dp)
                     .fillMaxWidth()
                     .verticalScroll(rememberScrollState())
                     .padding(top = 24.dp, bottom = 24.dp)
@@ -119,34 +120,40 @@ private fun OnboardingCard(
     onCancel: (() -> Unit)?,
     modifier: Modifier = Modifier,
 ) {
-    OutlinedCard(modifier) {
-        Column(Modifier.padding(20.dp)) {
+    OutlinedCard(modifier = modifier, elevation = 5.dp) {
+        Column(Modifier.padding(horizontal = 26.dp, vertical = 28.dp)) {
             Text(
                 "Olá! Vamos começar",
-                style = MaterialTheme.typography.headlineSmall,
+                style = MaterialTheme.typography.headlineMedium,
                 fontWeight = FontWeight.Bold,
             )
-            Spacer(Modifier.height(8.dp))
+            Spacer(Modifier.height(10.dp))
             Text(
                 "Conecte sua conta da CoinMarketCap para acessar o mercado.",
-                style = MaterialTheme.typography.bodyMedium,
+                style = MaterialTheme.typography.bodyLarge,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
-            Spacer(Modifier.height(20.dp))
+            Spacer(Modifier.height(24.dp))
             OutlinedTextField(
                 value = apiKey,
                 onValueChange = onApiKeyChange,
                 modifier = Modifier.fillMaxWidth(),
                 label = { Text("API key") },
                 singleLine = true,
+                shape = androidx.compose.foundation.shape.RoundedCornerShape(12.dp),
                 visualTransformation = if (showKey) VisualTransformation.None else PasswordVisualTransformation(),
                 trailingIcon = {
                     IconButton(onClick = onShowKeyChange) {
-                        Text(if (showKey) "◉" else "◎", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        CryptoIcon(
+                            if (showKey) CryptoIcon.EyeOff else CryptoIcon.Eye,
+                            if (showKey) "Ocultar chave" else "Mostrar chave",
+                            Modifier.height(22.dp).widthIn(min = 22.dp),
+                            MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
                     }
                 },
             )
-            Spacer(Modifier.height(18.dp))
+            Spacer(Modifier.height(20.dp))
             PrimaryActionButton(
                 text = if (state.submitting) "Validando..." else "Validar e salvar",
                 onClick = onContinue,
@@ -169,19 +176,24 @@ private fun OnboardingCard(
                 Spacer(Modifier.height(12.dp))
                 Text(message, color = CryptoNegative, style = MaterialTheme.typography.bodySmall)
             }
-            Spacer(Modifier.height(18.dp))
+            Spacer(Modifier.height(20.dp))
             Row(
                 verticalAlignment = Alignment.Top,
                 horizontalArrangement = Arrangement.spacedBy(9.dp),
             ) {
-                Text("▣", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                CryptoIcon(
+                    CryptoIcon.Lock,
+                    "Armazenamento seguro",
+                    Modifier.height(20.dp).widthIn(min = 20.dp),
+                    MaterialTheme.colorScheme.onSurfaceVariant,
+                )
                 Text(
                     "Sua chave será armazenada com segurança neste dispositivo.",
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    style = MaterialTheme.typography.bodySmall,
+                    style = MaterialTheme.typography.bodyMedium,
                 )
             }
-            HorizontalDivider(Modifier.padding(vertical = 16.dp), color = CryptoBorder)
+            HorizontalDivider(Modifier.padding(vertical = 20.dp), color = CryptoBorder)
             Text(
                 text = "Criar uma API key",
                 modifier = Modifier

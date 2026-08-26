@@ -7,7 +7,7 @@ Checkpoint atualizado em 25/08/2026. A marcação indica código implementado; v
 - [x] Integrar o armazenamento seguro ao estado raiz, onboarding e ajustes
 - [x] Remover o destino temporário `Testes` da navegação
 - [x] Manter somente `Mercado` e `Ajustes` como destinos principais
-- [x] Criar configuração central de rede, cache, banco e polling
+- [x] Manter somente paralelismo genérico de IO e banco na configuração de processamento
 - [x] Criar sincronização em etapas com validação, cancelamento e retomada
 - [x] Persistir checkpoints por página confirmada
 - [x] Respeitar a reserva de cota nas etapas não essenciais
@@ -25,7 +25,9 @@ Checkpoint atualizado em 25/08/2026. A marcação indica código implementado; v
 - [x] Ajustes exibe uso da API, sincronização, substituição, remoção e limpeza de cache
 - [x] Logos remotos possuem fallback local discreto
 - [x] Layout adaptável com barra inferior ou rail
-- [ ] Restaurar e finalizar filtros locais de preço, variação e corretora
+- [x] Aplicar a identidade dos mockups ao onboarding, mercado, filtros, expansão, corretoras, sincronização e navegação
+- [x] Filtros locais de capitalização, preço, variação e corretoras já relacionadas no cache
+- [x] Valores monetários, percentuais e idade do cache formatados para a apresentação planejada
 - [ ] Revisão visual e acessibilidade em tamanhos Android/iOS reais
 
 ## Core
@@ -37,7 +39,7 @@ Checkpoint atualizado em 25/08/2026. A marcação indica código implementado; v
 - [x] SQLDelight como fonte de verdade local
 - [x] Índices, WAL, `busy_timeout` e pool controlado por `Semaphore`/`Mutex`
 - [x] Upsert seguro de entidades-pai e `INSERT OR REPLACE` para snapshots
-- [x] Páginas paralelas com buffer/backpressure e batch transacional
+- [x] Pipeline genérico de páginas com paralelismo IO/banco, backpressure e batch transacional
 - [x] Retry limitado para erros transitórios e suporte a `Retry-After`
 - [x] Sincronização inicial completa até a última página disponível
 - [x] Startup atualiza somente corretoras essenciais quando o cache expirou
@@ -52,8 +54,9 @@ Checkpoint atualizado em 25/08/2026. A marcação indica código implementado; v
 - [x] Testes de armazenamento seguro e consulta de chave
 - [x] Testes de parsing das duas formas de cotação USD
 - [x] Testes de reserva de cota e percentual de progresso
-- [x] Teste Android host: 20 testes aprovados em 25/08/2026
+- [x] Teste Android host: 23 testes aprovados em 25/08/2026
 - [x] Compilação `:shared:compileAndroidMain` aprovada
+- [x] Compilação cruzada `:shared:compileKotlinIosSimulatorArm64` aprovada no host Linux
 - [ ] Testes do banco: upsert, rollback, FK, retomada e múltiplas conexões
 - [ ] Testes do coordenador: paralelismo, backpressure, retry, cancelamento e checkpoint
 - [ ] Testes de ViewModel: startup, polling, troca rápida e erros independentes
@@ -66,5 +69,5 @@ Checkpoint atualizado em 25/08/2026. A marcação indica código implementado; v
 
 1. Testes determinísticos do banco e do sincronizador com drivers/fakes.
 2. Roteiro manual de sincronização real, incluindo plano Basic/403 e retomada.
-3. Filtros locais e estados offline/desatualizado na UI.
+3. Roteiro visual nos tamanhos Android/iOS reais e estados offline/desatualizado.
 4. Benchmark, acessibilidade, CI e documentação final de entrega.

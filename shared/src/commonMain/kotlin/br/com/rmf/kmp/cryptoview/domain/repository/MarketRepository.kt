@@ -7,10 +7,11 @@ import br.com.rmf.kmp.cryptoview.domain.model.ApiResult
 import br.com.rmf.kmp.cryptoview.domain.model.CoinExchangeMarket
 import br.com.rmf.kmp.cryptoview.domain.model.CoinHistoryPoint
 import br.com.rmf.kmp.cryptoview.domain.model.CoinSummary
+import br.com.rmf.kmp.cryptoview.domain.model.CoinSortOrder
+import br.com.rmf.kmp.cryptoview.domain.model.CoinVariationFilter
 import br.com.rmf.kmp.cryptoview.domain.model.CryptoError
 import br.com.rmf.kmp.cryptoview.domain.model.ExchangeAsset
 import br.com.rmf.kmp.cryptoview.domain.model.ExchangeSummary
-import br.com.rmf.kmp.cryptoview.utils.CryptoProcessConfig
 import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
@@ -25,13 +26,28 @@ data class CoinDetailRefreshResult(
 class MarketRepository internal constructor(
     private val local: MarketLocalDataSource,
     private val remote: CoinMarketCapRemoteDataSource,
-    private val config: CryptoProcessConfig,
 ) {
-    fun observeCoins(query: String, limit: Int): Flow<List<CoinSummary>> =
-        local.observeCoins(query, limit.toLong())
+    fun observeCoins(
+        query: String,
+        limit: Int,
+        sortOrder: CoinSortOrder = CoinSortOrder.MARKET_CAP,
+        variation: CoinVariationFilter = CoinVariationFilter.ALL,
+        exchangeId: Long? = null,
+        offset: Int = 0,
+    ): Flow<List<CoinSummary>> = local.observeCoins(
+        query = query,
+        limit = limit.toLong(),
+        sortOrder = sortOrder,
+        variation = variation,
+        exchangeId = exchangeId,
+        offset = offset.toLong(),
+    )
 
-    fun observeExchanges(query: String, limit: Int): Flow<List<ExchangeSummary>> =
-        local.observeExchanges(query, limit.toLong())
+    fun observeExchanges(query: String, limit: Int, offset: Int = 0): Flow<List<ExchangeSummary>> =
+        local.observeExchanges(query, limit.toLong(), offset.toLong())
+
+    fun observeCachedMarketExchanges(limit: Int): Flow<List<ExchangeSummary>> =
+        local.observeCachedMarketExchanges(limit.toLong())
 
     fun observeCoin(id: Long): Flow<CoinSummary?> = local.observeCoin(id)
     fun observeExchange(id: Long): Flow<ExchangeSummary?> = local.observeExchange(id)
@@ -45,7 +61,7 @@ class MarketRepository internal constructor(
 
     suspend fun refreshExchangeAssets(exchangeId: Long, force: Boolean = false): CryptoError? {
         val key = "exchange_assets:$exchangeId"
-        if (!force && local.isFresh(key, config.metadataCacheTtlMillis)) return null
+        if (!force && local.isFresh(key, METADATA_CACHE_TTL_MILLIS)) return null
         return when (val result = remote.exchangeAssets(exchangeId).first()) {
             is ApiResult.Success -> {
                 local.replaceAssets(exchangeId, result.data)
@@ -85,7 +101,7 @@ class MarketRepository internal constructor(
 
     suspend fun refreshMarkets(coinId: Long, force: Boolean = false): CryptoError? {
         val key = "coin_markets:$coinId"
-        if (!force && local.isFresh(key, config.marketPairsCacheTtlMillis)) return null
+        if (!force && local.isFresh(key, MARKET_PAIRS_CACHE_TTL_MILLIS)) return null
         return when (val result = remote.coinMarketPairs(coinId).first()) {
             is ApiResult.Success -> {
                 local.replaceMarkets(coinId, result.data)
@@ -100,7 +116,7 @@ class MarketRepository internal constructor(
 
     suspend fun refreshHistory(coinId: Long, force: Boolean = false): CryptoError? {
         val key = "coin_history:$coinId"
-        if (!force && local.isFresh(key, config.historyCacheTtlMillis)) return null
+        if (!force && local.isFresh(key, HISTORY_CACHE_TTL_MILLIS)) return null
         return when (val result = remote.coinHistory(coinId).first()) {
             is ApiResult.Success -> {
                 local.replaceHistory(coinId, result.data)
@@ -118,5 +134,11 @@ class MarketRepository internal constructor(
     private fun MarketLocalDataSource.isFresh(key: String, ttl: Long): Boolean {
         val lastSuccess = resourceLastSuccess(key) ?: return false
         return currentTimeMillis() - lastSuccess < ttl
+    }
+
+    private companion object {
+        const val METADATA_CACHE_TTL_MILLIS = 24 * 60 * 60_000L
+        const val MARKET_PAIRS_CACHE_TTL_MILLIS = 5 * 60_000L
+        const val HISTORY_CACHE_TTL_MILLIS = 15 * 60_000L
     }
 }

@@ -40,6 +40,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import br.com.rmf.kmp.cryptoview.domain.model.CoinMarketCapKeyInfo
 import br.com.rmf.kmp.cryptoview.domain.model.SyncStatus
 import br.com.rmf.kmp.cryptoview.ui.components.InfoRow
+import br.com.rmf.kmp.cryptoview.ui.components.LocalFloatingNavigationContentPadding
 import br.com.rmf.kmp.cryptoview.ui.components.OutlinedCard
 import br.com.rmf.kmp.cryptoview.ui.components.PrimaryActionButton
 import br.com.rmf.kmp.cryptoview.ui.components.SettingsDivider
@@ -65,6 +66,7 @@ fun SettingsScreen(
     var showSync by rememberSaveable { mutableStateOf(false) }
     var showClear by rememberSaveable { mutableStateOf(false) }
     var showRemove by rememberSaveable { mutableStateOf(false) }
+    val floatingNavigationPadding = LocalFloatingNavigationContentPadding.current
 
     LaunchedEffect(sync.status) { if (sync.status == SyncStatus.RUNNING) showSync = true }
 
@@ -74,15 +76,20 @@ fun SettingsScreen(
     ) {
         LazyColumn(
             modifier = Modifier.fillMaxSize().widthIn(max = 820.dp),
-            contentPadding = PaddingValues(16.dp),
-            verticalArrangement = Arrangement.spacedBy(13.dp),
+            contentPadding = PaddingValues(
+                start = 18.dp,
+                top = 22.dp,
+                end = 18.dp,
+                bottom = 26.dp + floatingNavigationPadding,
+            ),
+            verticalArrangement = Arrangement.spacedBy(18.dp),
         ) {
-            item { Text("Ajustes", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold) }
+            item { Text("Ajustes", style = MaterialTheme.typography.displaySmall) }
             item {
-                Text("API CoinMarketCap", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-                Spacer(Modifier.height(8.dp))
+                Text("API CoinMarketCap", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+                Spacer(Modifier.height(10.dp))
                 OutlinedCard(Modifier.fillMaxWidth()) {
-                    Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(11.dp)) {
+                    Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(13.dp)) {
                         InfoRow("Status", "Configurada com segurança")
                         validationMessage?.let { InfoRow("Validação", it) }
                         InfoRow("Limite mensal", keyInfo?.plan?.creditLimitMonthly?.toString() ?: "Consultar novamente")
@@ -104,10 +111,10 @@ fun SettingsScreen(
                 }
             }
             item {
-                Text("Dados locais", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-                Spacer(Modifier.height(8.dp))
+                Text("Dados locais", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+                Spacer(Modifier.height(10.dp))
                 OutlinedCard(Modifier.fillMaxWidth()) {
-                    Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(11.dp)) {
+                    Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(13.dp)) {
                         InfoRow("Moedas salvas", data.coinCount.toString())
                         InfoRow("Corretoras salvas", data.exchangeCount.toString())
                         InfoRow("Estado", sync.message ?: "Pronto")
@@ -139,7 +146,8 @@ fun SettingsScreen(
             properties = DialogProperties(usePlatformDefaultWidth = false),
         ) {
             Card(
-                modifier = Modifier.fillMaxWidth(.88f).widthIn(max = 440.dp),
+                modifier = Modifier.fillMaxWidth(.92f).widthIn(max = 520.dp),
+                shape = androidx.compose.foundation.shape.RoundedCornerShape(18.dp),
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
             ) {
                 SyncProgressContent(

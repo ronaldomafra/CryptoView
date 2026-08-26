@@ -1,5 +1,17 @@
 package br.com.rmf.kmp.cryptoview.domain.model
 
+enum class CoinSortOrder {
+    RANK,
+    MARKET_CAP,
+    PRICE,
+}
+
+enum class CoinVariationFilter {
+    ALL,
+    POSITIVE,
+    NEGATIVE,
+}
+
 data class CoinSummary(
     val id: Long,
     val name: String,
@@ -12,8 +24,8 @@ data class CoinSummary(
     val percentChange24h: Double?,
     val marketCapUsd: Double?,
     val quoteUpdatedAt: String?,
+    val quoteFetchedAt: Long?,
     val logoUrl: String?,
-    val cachedExchangeCount: Long,
 )
 
 data class CoinDetail(
@@ -83,4 +95,3 @@ data class ApiQuotaSnapshot(
         return left <= (limit * reservePercent / 100)
     }
 }
-

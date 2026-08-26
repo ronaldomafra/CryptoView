@@ -10,7 +10,6 @@ import br.com.rmf.kmp.cryptoview.domain.model.api.ExchangeListingDto
 import br.com.rmf.kmp.cryptoview.domain.model.api.ExchangeMetadataDto
 import br.com.rmf.kmp.cryptoview.domain.model.api.GlobalMetricsDto
 import br.com.rmf.kmp.cryptoview.domain.model.api.KeyInfoDto
-import br.com.rmf.kmp.cryptoview.utils.CryptoProcessConfig
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.emitAll
 import kotlinx.coroutines.flow.flow
@@ -20,13 +19,12 @@ internal class CoinMarketCapRemoteDataSource(
     private val requestExecutor: CoinMarketCapRequestExecutor,
     private val authenticatedExecutor: AuthenticatedRequestExecutor,
     private val rateLimiter: ApiRateLimiter,
-    private val config: CryptoProcessConfig,
 ) {
-    private var requestsPerMinute = config.fallbackRequestsPerMinute
+    private var requestsPerMinute = FALLBACK_REQUESTS_PER_MINUTE
 
     fun updateRateLimit(limit: Int?) {
-        requestsPerMinute = limit?.coerceAtMost(config.fallbackRequestsPerMinute)
-            ?: config.fallbackRequestsPerMinute
+        requestsPerMinute = limit?.coerceAtMost(FALLBACK_REQUESTS_PER_MINUTE)
+            ?: FALLBACK_REQUESTS_PER_MINUTE
     }
 
     fun keyInfo(): Flow<ApiResult<KeyInfoDto>> = authenticated {
@@ -76,5 +74,9 @@ internal class CoinMarketCapRemoteDataSource(
             rateLimiter.acquire(requestsPerMinute)
             emitAll(request(apiKey))
         }
+    }
+
+    private companion object {
+        const val FALLBACK_REQUESTS_PER_MINUTE = 45
     }
 }

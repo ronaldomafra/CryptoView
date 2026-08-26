@@ -1,6 +1,5 @@
 package br.com.rmf.kmp.cryptoview
 
-import br.com.rmf.kmp.cryptoview.utils.CryptoProcessConfig
 import br.com.rmf.kmp.cryptoview.utils.defaultCryptoProcessConfig
 import br.com.rmf.kmp.cryptoview.data.api.configureCryptoHttpClient
 import io.ktor.client.HttpClient
@@ -10,7 +9,7 @@ import org.koin.core.module.dsl.onClose
 import org.koin.core.module.dsl.withOptions
 import org.koin.dsl.module
 import platform.Foundation.NSLog
-import platform.Foundation.NSDate
+import platform.CoreFoundation.CFAbsoluteTimeGetCurrent
 import platform.UIKit.UIDevice
 
 class IOSPlatform: Platform {
@@ -18,13 +17,12 @@ class IOSPlatform: Platform {
 }
 
 actual fun currentTimeMillis(): Long =
-    (NSDate().timeIntervalSince1970 * 1_000.0).toLong()
+    ((CFAbsoluteTimeGetCurrent() + 978_307_200.0) * 1_000.0).toLong()
 
 actual fun getPlatform(): Platform = IOSPlatform()
 
-actual fun setPlatformHttpClient(config: CryptoProcessConfig): HttpClient = HttpClient(Darwin) {
+actual fun setPlatformHttpClient(): HttpClient = HttpClient(Darwin) {
     configureCryptoHttpClient(
-        config = config,
         networkLogger = object : Logger {
             override fun log(message: String) {
                 NSLog("CryptoViewHttp: %@", message)
@@ -36,11 +34,11 @@ actual fun setPlatformHttpClient(config: CryptoProcessConfig): HttpClient = Http
 actual val platformModule = module {
     single {
         defaultCryptoProcessConfig(
-            databaseWriteParallelism = 1,
-            databasePoolSize = 1,
+            parallelIoValue = 20,
+            parallelDbValue = 1,
         )
     }
-    single<HttpClient> { setPlatformHttpClient(get()) } withOptions {
+    single<HttpClient> { setPlatformHttpClient() } withOptions {
         onClose { client -> client?.close() }
     }
 }

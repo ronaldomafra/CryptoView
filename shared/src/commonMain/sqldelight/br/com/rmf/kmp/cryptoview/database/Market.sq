@@ -188,14 +188,33 @@ SELECT
     q.percentChange24h,
     q.marketCap,
     q.remoteUpdatedAt AS quoteUpdatedAt,
-    m.logoUrl,
-    (SELECT COUNT(*) FROM coin_exchange_market cm WHERE cm.coinId = c.id) AS cachedExchangeCount
+    q.fetchedAt AS quoteFetchedAt,
+    m.logoUrl
 FROM coin c
 LEFT JOIN coin_quote q ON q.coinId = c.id
 LEFT JOIN coin_metadata m ON m.coinId = c.id
 WHERE c.active = 1
   AND (:query = '' OR c.normalizedName LIKE :queryLike OR c.symbol LIKE :queryLike)
-ORDER BY CASE WHEN c.rank IS NULL THEN 1 ELSE 0 END, c.rank ASC, c.name ASC
+  AND (
+    :variation = 'ALL'
+    OR (:variation = 'POSITIVE' AND q.percentChange24h >= 0)
+    OR (:variation = 'NEGATIVE' AND q.percentChange24h < 0)
+  )
+  AND (
+    :exchangeId = -1
+    OR EXISTS (
+      SELECT 1 FROM coin_exchange_market cm
+      WHERE cm.coinId = c.id AND cm.exchangeId = :exchangeId
+    )
+  )
+ORDER BY
+  CASE WHEN :sortOrder = 'RANK' AND c.rank IS NULL THEN 1 ELSE 0 END,
+  CASE WHEN :sortOrder = 'RANK' THEN c.rank END ASC,
+  CASE WHEN :sortOrder = 'MARKET_CAP' AND q.marketCap IS NULL THEN 1 ELSE 0 END,
+  CASE WHEN :sortOrder = 'MARKET_CAP' THEN q.marketCap END DESC,
+  CASE WHEN :sortOrder = 'PRICE' AND q.price IS NULL THEN 1 ELSE 0 END,
+  CASE WHEN :sortOrder = 'PRICE' THEN q.price END DESC,
+  c.name ASC
 LIMIT :limit OFFSET :offset;
 
 selectCoinById:
@@ -211,6 +230,7 @@ SELECT
     q.percentChange24h,
     q.marketCap,
     q.remoteUpdatedAt AS quoteUpdatedAt,
+    q.fetchedAt AS quoteFetchedAt,
     m.logoUrl,
     m.description,
     m.websiteUrl
@@ -296,6 +316,27 @@ SELECT
 FROM market_exchange e
 LEFT JOIN exchange_metadata m ON m.exchangeId = e.id
 WHERE e.id = ?;
+
+selectCachedMarketExchanges:
+SELECT
+    e.id,
+    e.name,
+    e.slug,
+    e.rank,
+    e.numMarketPairs,
+    e.spotVolumeUsd,
+    COALESCE(m.dateLaunched, e.dateLaunched) AS resolvedDateLaunched,
+    m.logoUrl,
+    m.description,
+    m.websiteUrl,
+    m.makerFee,
+    m.takerFee
+FROM market_exchange e
+LEFT JOIN exchange_metadata m ON m.exchangeId = e.id
+WHERE e.active = 1
+  AND EXISTS (SELECT 1 FROM coin_exchange_market cm WHERE cm.exchangeId = e.id)
+ORDER BY CASE WHEN e.rank IS NULL THEN 1 ELSE 0 END, e.rank ASC, e.name ASC
+LIMIT :limit;
 
 selectExchangeIdsMissingMetadata:
 SELECT e.id

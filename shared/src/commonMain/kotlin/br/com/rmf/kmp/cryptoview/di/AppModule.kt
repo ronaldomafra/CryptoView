@@ -12,12 +12,10 @@ import br.com.rmf.kmp.cryptoview.data.database.MarketLocalDataSource
 import br.com.rmf.kmp.cryptoview.data.database.createConfiguredDriver
 import br.com.rmf.kmp.cryptoview.database.CryptoDatabase
 import br.com.rmf.kmp.cryptoview.domain.repository.MarketRepository
+import br.com.rmf.kmp.cryptoview.domain.sync.CryptoSyncCoordinator
 import br.com.rmf.kmp.cryptoview.domain.sync.CryptoSyncManager
+import br.com.rmf.kmp.cryptoview.domain.sync.DefaultCryptoSyncCoordinator
 import br.com.rmf.kmp.cryptoview.domain.sync.DefaultCryptoSyncManager
-import br.com.rmf.kmp.cryptoview.domain.sync.SyncCoinMetadataStep
-import br.com.rmf.kmp.cryptoview.domain.sync.SyncCoinsStep
-import br.com.rmf.kmp.cryptoview.domain.sync.SyncExchangeMetadataStep
-import br.com.rmf.kmp.cryptoview.domain.sync.SyncExchangesStep
 import br.com.rmf.kmp.cryptoview.domain.repository.CoinMarketCapDataRepository
 import br.com.rmf.kmp.cryptoview.domain.usecase.GetKeyInfoUseCase
 import br.com.rmf.kmp.cryptoview.security.DataStoreEncryptedApiKeyEnvelopeStore
@@ -61,14 +59,13 @@ internal val networkModule = module {
             requestExecutor = get(),
             authenticatedExecutor = get(),
             rateLimiter = get(),
-            config = get(),
         )
     }
 }
 
 internal val databaseModule = module {
     single<SqlDriver> {
-        get<CryptoDatabaseDriverFactory>().createConfiguredDriver(get())
+        get<CryptoDatabaseDriverFactory>().createConfiguredDriver()
     } withOptions {
         onClose { driver -> driver?.close() }
     }
@@ -83,23 +80,19 @@ internal val repositoryModule = module {
             getKeyInfoUseCase = get(),
         )
     }
-    single { MarketRepository(local = get(), remote = get(), config = get()) }
+    single { MarketRepository(local = get(), remote = get()) }
 }
 
 internal val syncModule = module {
-    single { SyncExchangesStep(get(), get(), get()) }
-    single { SyncExchangeMetadataStep(get(), get(), get()) }
-    single { SyncCoinsStep(get(), get(), get()) }
-    single { SyncCoinMetadataStep(get(), get(), get()) }
-    single<CryptoSyncManager> {
-        DefaultCryptoSyncManager(
+    single<CryptoSyncCoordinator> {
+        DefaultCryptoSyncCoordinator(
             secureApiKeyStorage = get(),
             remote = get(),
             local = get(),
             config = get(),
-            steps = listOf(get<SyncExchangesStep>(), get<SyncExchangeMetadataStep>(), get<SyncCoinsStep>(), get<SyncCoinMetadataStep>()),
         )
     }
+    single<CryptoSyncManager> { DefaultCryptoSyncManager(coordinator = get()) }
 }
 
 internal val useCaseModule = module {
@@ -125,7 +118,7 @@ internal val securityModule = module {
 
 internal val viewModelModule = module {
     factory { AppViewModel(get(), get(), get(), get()) }
-    factory { MarketViewModel(get(), get(), get()) }
+    factory { MarketViewModel(get(), get()) }
     factory { ExchangeDetailViewModel(get()) }
     factory { CoinMarketsViewModel(get()) }
     factory { SettingsViewModel(get(), get()) }

@@ -16,12 +16,11 @@ interface CryptoDatabaseDriverFactory {
 }
 
 internal fun CryptoDatabaseDriverFactory.createConfiguredDriver(
-    config: CryptoProcessConfig,
 ): SqlDriver = createDriver().also { driver ->
     driver.executePragmaQuery("PRAGMA foreign_keys=ON")
     driver.executePragmaQuery("PRAGMA journal_mode=WAL")
     driver.executePragmaQuery("PRAGMA synchronous=NORMAL")
-    driver.executePragmaQuery("PRAGMA busy_timeout=${config.databaseBusyTimeoutMillis}")
+    driver.executePragmaQuery("PRAGMA busy_timeout=$DATABASE_BUSY_TIMEOUT_MILLIS")
 }
 
 internal data class CryptoDatabaseConnection(
@@ -33,7 +32,7 @@ internal class CryptoDatabasePool(
     private val driverFactory: CryptoDatabaseDriverFactory,
     private val config: CryptoProcessConfig,
 ) {
-    private val size = config.databasePoolSize.coerceIn(1, config.databasePoolMaxSize)
+    private val size = config.parallelDbValue.coerceIn(1, MAX_DATABASE_CONNECTIONS)
     private val semaphore = Semaphore(size)
     private val lock = Mutex()
     private val available = ArrayDeque<CryptoDatabaseConnection>()
@@ -61,7 +60,7 @@ internal class CryptoDatabasePool(
         val shouldCheckpoint = lock.withLock {
             committedBatches += 1
             _changeVersion.value += 1
-            committedBatches % config.walCheckpointEveryCommittedBatches == 0
+            committedBatches % WAL_CHECKPOINT_BATCH_INTERVAL == 0
         }
         if (shouldCheckpoint) {
             runCatching { driver.executePragmaQuery("PRAGMA wal_checkpoint(PASSIVE)") }
@@ -85,7 +84,7 @@ internal class CryptoDatabasePool(
     }
 
     private fun createConnection(): CryptoDatabaseConnection {
-        val driver = driverFactory.createConfiguredDriver(config)
+        val driver = driverFactory.createConfiguredDriver()
         return CryptoDatabaseConnection(driver, CryptoDatabase(driver)).also(all::add)
     }
 }
@@ -102,3 +101,7 @@ private fun SqlDriver.executePragmaQuery(sql: String) {
         binders = null,
     ).value
 }
+
+private const val MAX_DATABASE_CONNECTIONS = 4
+private const val DATABASE_BUSY_TIMEOUT_MILLIS = 5_000L
+private const val WAL_CHECKPOINT_BATCH_INTERVAL = 10

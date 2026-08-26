@@ -2,7 +2,6 @@ package br.com.rmf.kmp.cryptoview
 
 import android.os.Build
 import android.util.Log
-import br.com.rmf.kmp.cryptoview.utils.CryptoProcessConfig
 import br.com.rmf.kmp.cryptoview.utils.defaultCryptoProcessConfig
 import br.com.rmf.kmp.cryptoview.data.api.configureCryptoHttpClient
 import io.ktor.client.HttpClient
@@ -18,9 +17,8 @@ class AndroidPlatform : Platform {
 
 actual fun getPlatform(): Platform = AndroidPlatform()
 
-actual fun setPlatformHttpClient(config: CryptoProcessConfig): HttpClient = HttpClient(CIO) {
+actual fun setPlatformHttpClient(): HttpClient = HttpClient(CIO) {
     configureCryptoHttpClient(
-        config = config,
         networkLogger = object : Logger {
             override fun log(message: String) {
                 Log.d("CryptoViewHttp", message)
@@ -32,11 +30,11 @@ actual fun setPlatformHttpClient(config: CryptoProcessConfig): HttpClient = Http
 actual val platformModule = module {
     single {
         defaultCryptoProcessConfig(
-            databaseWriteParallelism = 2,
-            databasePoolSize = 2,
+            parallelIoValue = 20,
+            parallelDbValue = 2,
         )
     }
-    single<HttpClient> { setPlatformHttpClient(get()) } withOptions {
+    single<HttpClient> { setPlatformHttpClient() } withOptions {
         onClose { client -> client?.close() }
     }
 }

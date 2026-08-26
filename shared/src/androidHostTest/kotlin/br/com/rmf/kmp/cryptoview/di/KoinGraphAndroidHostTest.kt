@@ -35,9 +35,8 @@ class KoinGraphAndroidHostTest {
             )
             assertNotSame(koin.get<GetKeyInfoUseCase>(), koin.get<GetKeyInfoUseCase>())
             val config = koin.get<CryptoProcessConfig>()
-            assertEquals(2, config.databasePoolSize)
-            assertEquals(2, config.databaseWriteParallelism)
-            assertEquals(10, config.networkParallelism)
+            assertEquals(20, config.parallelIoValue)
+            assertEquals(2, config.parallelDbValue)
         } finally {
             stopKoin()
         }

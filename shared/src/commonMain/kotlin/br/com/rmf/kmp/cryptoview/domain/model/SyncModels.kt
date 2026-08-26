@@ -53,27 +53,6 @@ enum class SyncExecutionResult {
     STARTED,
 }
 
-sealed interface SyncStepDecision {
-    data object Run : SyncStepDecision
-    data class Skip(val reason: String) : SyncStepDecision
-    data class Stop(val error: CryptoError) : SyncStepDecision
-}
-
-data class SyncContext(
-    val runId: String,
-    val trigger: SyncTrigger,
-    val quota: ApiQuotaSnapshot,
-    val committedPages: Map<SyncPhase, Set<Int>>,
-)
-
-sealed interface SyncEvent {
-    data class PhaseStarted(val phase: SyncPhase, val message: String) : SyncEvent
-    data class PageRequested(val phase: SyncPhase, val page: Int) : SyncEvent
-    data class PageCommitted(val phase: SyncPhase, val page: Int, val items: Int) : SyncEvent
-    data class StepSkipped(val phase: SyncPhase, val reason: String) : SyncEvent
-    data class TargetDiscovered(val phase: SyncPhase, val items: Long) : SyncEvent
-}
-
 data class SyncResumeData(
     val runId: String,
     val trigger: SyncTrigger,

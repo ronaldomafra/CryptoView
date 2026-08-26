@@ -7,7 +7,6 @@ import br.com.rmf.kmp.cryptoview.domain.model.ApiResult
 import br.com.rmf.kmp.cryptoview.domain.model.CoinMarketCapKeyInfo
 import br.com.rmf.kmp.cryptoview.domain.model.CryptoError
 import br.com.rmf.kmp.cryptoview.domain.repository.CoinMarketCapDataRepository
-import br.com.rmf.kmp.cryptoview.utils.defaultCryptoProcessConfig
 import de.jensklingenberg.ktorfit.Ktorfit
 import de.jensklingenberg.ktorfit.converter.FlowConverterFactory
 import de.jensklingenberg.ktorfit.converter.ResponseConverterFactory
@@ -214,10 +213,6 @@ class GetKeyInfoUseCaseTest {
         val engine = MockEngine { request -> handler(request) }
         val httpClient = HttpClient(engine) {
             configureCryptoHttpClient(
-                config = defaultCryptoProcessConfig(
-                    databaseWriteParallelism = 1,
-                    databasePoolSize = 1,
-                ),
                 networkLogger = logger,
             )
         }

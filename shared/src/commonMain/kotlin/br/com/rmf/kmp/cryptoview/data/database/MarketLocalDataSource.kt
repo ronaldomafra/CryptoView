@@ -5,6 +5,8 @@ import br.com.rmf.kmp.cryptoview.database.CryptoDatabase
 import br.com.rmf.kmp.cryptoview.domain.model.CoinExchangeMarket
 import br.com.rmf.kmp.cryptoview.domain.model.CoinHistoryPoint
 import br.com.rmf.kmp.cryptoview.domain.model.CoinSummary
+import br.com.rmf.kmp.cryptoview.domain.model.CoinSortOrder
+import br.com.rmf.kmp.cryptoview.domain.model.CoinVariationFilter
 import br.com.rmf.kmp.cryptoview.domain.model.ExchangeAsset
 import br.com.rmf.kmp.cryptoview.domain.model.ExchangeSummary
 import br.com.rmf.kmp.cryptoview.domain.model.SyncPhase
@@ -31,44 +33,57 @@ internal class MarketLocalDataSource(
     private val database: CryptoDatabase,
     private val pool: CryptoDatabasePool,
 ) {
-    fun observeCoins(query: String, limit: Long): Flow<List<CoinSummary>> {
+    fun observeCoins(
+        query: String,
+        limit: Long,
+        sortOrder: CoinSortOrder,
+        variation: CoinVariationFilter,
+        exchangeId: Long?,
+        offset: Long,
+    ): Flow<List<CoinSummary>> {
         val normalized = query.trim().lowercase()
         return pool.changeVersion.map {
             database.marketQueries.selectCoins(
                 query = normalized,
                 queryLike = "%$normalized%",
+                variation = variation.name,
+                sortOrder = sortOrder.name,
+                exchangeId = exchangeId ?: -1L,
                 limit = limit,
-                offset = 0,
+                offset = offset,
                 mapper = { id, name, symbol, slug, rank, numMarketPairs, price, volume24h,
-                    percentChange24h, marketCap, quoteUpdatedAt, logoUrl, cachedExchangeCount ->
+                    percentChange24h, marketCap, quoteUpdatedAt, quoteFetchedAt, logoUrl ->
                     CoinSummary(id, name, symbol, slug, rank, numMarketPairs, price, volume24h,
-                        percentChange24h, marketCap, quoteUpdatedAt, logoUrl, cachedExchangeCount)
+                        percentChange24h, marketCap, quoteUpdatedAt, quoteFetchedAt, logoUrl)
                 },
             ).executeAsList()
         }.flowOn(Dispatchers.Default)
     }
 
-    fun observeExchanges(query: String, limit: Long): Flow<List<ExchangeSummary>> {
+    fun observeExchanges(query: String, limit: Long, offset: Long): Flow<List<ExchangeSummary>> {
         val normalized = query.trim().lowercase()
         return pool.changeVersion.map {
             database.marketQueries.selectExchanges(
                 query = normalized,
                 queryLike = "%$normalized%",
                 limit = limit,
-                offset = 0,
+                offset = offset,
                 mapper = ::mapExchange,
             ).executeAsList()
         }.flowOn(Dispatchers.Default)
     }
 
+    fun observeCachedMarketExchanges(limit: Long): Flow<List<ExchangeSummary>> = pool.changeVersion.map {
+        database.marketQueries.selectCachedMarketExchanges(limit, mapper = ::mapExchange).executeAsList()
+    }.flowOn(Dispatchers.Default)
+
     fun observeCoin(id: Long): Flow<CoinSummary?> = pool.changeVersion.map {
         database.marketQueries.selectCoinById(
             id,
             mapper = { coinId, name, symbol, slug, rank, numMarketPairs, price, volume24h,
-                percentChange24h, marketCap, quoteUpdatedAt, logoUrl, _, _ ->
+                percentChange24h, marketCap, quoteUpdatedAt, quoteFetchedAt, logoUrl, _, _ ->
                 CoinSummary(coinId, name, symbol, slug, rank, numMarketPairs, price, volume24h,
-                    percentChange24h, marketCap, quoteUpdatedAt, logoUrl,
-                    database.marketQueries.selectCoinMarkets(coinId).executeAsList().size.toLong())
+                    percentChange24h, marketCap, quoteUpdatedAt, quoteFetchedAt, logoUrl)
             },
         ).executeAsOneOrNull()
     }.flowOn(Dispatchers.Default)
@@ -97,7 +112,7 @@ internal class MarketLocalDataSource(
     }.flowOn(Dispatchers.Default)
 
     fun coinDescription(id: Long): Pair<String?, String?> = database.marketQueries
-        .selectCoinById(id) { _, _, _, _, _, _, _, _, _, _, _, _, description, website ->
+        .selectCoinById(id) { _, _, _, _, _, _, _, _, _, _, _, _, _, description, website ->
             description to website
         }
         .executeAsOneOrNull() ?: (null to null)
