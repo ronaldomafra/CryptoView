@@ -44,6 +44,41 @@ Aplicativo Kotlin Multiplatform criado para o [desafio mobile do Mercado Bitcoin
 
 O aplicativo também foi validado manualmente no iOS. As capturas dessa plataforma serão adicionadas posteriormente.
 
+## Telas iOS
+
+<table>
+  <tr>
+    <td align="center"><strong>Splash</strong></td>
+    <td align="center"><strong>Onboarding</strong></td>
+    <td align="center"><strong>Mercado</strong></td>
+    <td align="center"><strong>Detalhe da moeda</strong></td>
+  </tr>
+  <tr>
+    <td><img src="docs/telas/ios-splash.png" width="190" alt="Splash do CryptoView no iOS" /></td>
+    <td><img src="docs/telas/ios-onboarding.png" width="190" alt="Onboarding iOS" /></td>
+    <td><img src="docs/telas/ios-mercado.png" width="190" alt="Mercado de moedas no iOS" /></td>
+    <td><img src="docs/telas/ios-detalhe-moeda.png" width="190" alt="Detalhe expandido da moeda no iOS" /></td>
+  </tr>
+  <tr>
+    <td align="center"><strong>Informações da moeda</strong></td>
+    <td align="center"><strong>Filtros</strong></td>
+    <td align="center"><strong>Sincronização</strong></td>
+    <td align="center"><strong>Ajustes</strong></td>
+  </tr>
+  <tr>
+    <td><img src="docs/telas/ios-informacoes-moeda.png" width="190" alt="Informações da moeda no iOS" /></td>
+    <td><img src="docs/telas/ios-filtros.png" width="190" alt="Filtros do mercado no iOS" /></td>
+    <td><img src="docs/telas/ios-sincronizacao.png" width="190" alt="Progresso da sincronização no iOS" /></td>
+    <td><img src="docs/telas/ios-ajustes.png" width="190" alt="Ajustes e estado dos dados no iOS" /></td>
+  </tr>
+</table>
+
+## Vídeo iOS
+
+<video src="docs/videos/ios-demonstracao.mp4" controls width="720">
+  Seu navegador não oferece suporte à reprodução de vídeo.
+</video>
+
 ## Arquitetura e estado
 
 O projeto utiliza **MVVM**, fluxo unidirecional de dados e abordagem **local-first**. Essa foi uma decisão arquitetural específica para o desafio, com o objetivo de demonstrar sincronização, resiliência e uso reativo do SQLite; não pressupõe que o aplicativo real do Mercado Bitcoin siga a mesma abordagem.
