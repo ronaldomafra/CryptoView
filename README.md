@@ -75,10 +75,8 @@ O aplicativo também foi validado manualmente no iOS. As capturas dessa platafor
 
 ## Vídeo iOS
 
-[![Assistir à demonstração do CryptoView no iOS](docs/telas/ios-mercado.png)](docs/videos/ios-demonstracao.mp4)
-
-[▶ Assistir ao vídeo do iOS](docs/videos/ios-demonstracao.mp4)
-
+![Demonstração do CryptoView no iOS](docs/videos/ios-demonstracao.gif)
+  
 ## Arquitetura e estado
 
 O projeto utiliza **MVVM**, fluxo unidirecional de dados e abordagem **local-first**. Essa foi uma decisão arquitetural específica para o desafio, com o objetivo de demonstrar sincronização, resiliência e uso reativo do SQLite; não pressupõe que o aplicativo real do Mercado Bitcoin siga a mesma abordagem.
