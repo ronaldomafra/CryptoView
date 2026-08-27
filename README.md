@@ -75,9 +75,9 @@ O aplicativo também foi validado manualmente no iOS. As capturas dessa platafor
 
 ## Vídeo iOS
 
-<video src="docs/videos/ios-demonstracao.mp4" controls width="720">
-  Seu navegador não oferece suporte à reprodução de vídeo.
-</video>
+[![Assistir à demonstração do CryptoView no iOS](docs/telas/ios-mercado.png)](docs/videos/ios-demonstracao.mp4)
+
+[▶ Assistir ao vídeo do iOS](docs/videos/ios-demonstracao.mp4)
 
 ## Arquitetura e estado
 
